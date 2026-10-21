@@ -23,6 +23,16 @@ local resources = {
         option("maelstrom", "PRESET_RESOURCE_MAELSTROM", { allowsAmount = true }),
         option("runic_power", "PRESET_RESOURCE_RUNIC_POWER", { allowsAmount = true }),
         option("soul_shards", "PRESET_RESOURCE_SOUL_SHARDS", { allowsAmount = true }),
+        option("essence", "PRESET_RESOURCE_ESSENCE", {
+            children = {
+                option("essence", "PRESET_RESOURCE_ESSENCE", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_PLURAL" }),
+                option("red_essence", "PRESET_RESOURCE_ESSENCE_RED", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_RED_PLURAL", color = "ff0000" }),
+                option("blue_essence", "PRESET_RESOURCE_ESSENCE_BLUE", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_BLUE_PLURAL", color = "0070dd" }),
+                option("black_essence", "PRESET_RESOURCE_ESSENCE_BLACK", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_BLACK_PLURAL", color = "4f2e00" }),
+                option("bronze_essence", "PRESET_RESOURCE_ESSENCE_BRONZE", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_BRONZE_PLURAL", color = "ff9300" }),
+                option("green_essence", "PRESET_RESOURCE_ESSENCE_GREEN", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_GREEN_PLURAL", color = "00ff00" }),
+            },
+        }),
         option("reagents", "PRESET_RESOURCE_REAGENTS", { allowsAmount = false }),
     },
     ability = {
@@ -96,6 +106,7 @@ local magicTypes = {
 
 local magicSubtypes = {
     option("runes", "PRESET_MAGIC_RUNES"),
+    option("prismatic", "PRESET_MAGIC_PRISMATIC"),
     option("technomancy", "PRESET_MAGIC_TECHNOMANCY"),
     option("blood", "PRESET_MAGIC_BLOOD"),
     option("chronomancy", "PRESET_MAGIC_CHRONOMANCY"),
@@ -142,6 +153,9 @@ local function localize(options)
     for index, item in ipairs(options or {}) do
         localized[index] = {
             allowsAmount = item.allowsAmount,
+            children = item.children and localize(item.children) or nil,
+            color = item.color,
+            plural = item.pluralKey and addon.L(item.pluralKey) or nil,
             exclusive = item.exclusive,
             label = addon.L(item.labelKey),
             order = item.order,
@@ -153,7 +167,25 @@ local function localize(options)
 end
 
 function addon.SpellCreationPresets.GetResources(kind)
-    return localize(resources[kind] or resources.magic)
+    local result = localize(resources[kind] or resources.magic)
+    for _, text in ipairs(addon.SpellCreationPresets.GetCustomPresets("resource")) do
+        result[#result + 1] = {
+            value = text, label = text, allowsAmount = true, custom = true,
+        }
+    end
+    return result
+end
+
+function addon.SpellCreationPresets.FormatResource(resource, amount)
+    for _, group in ipairs(addon.SpellCreationPresets.GetResources("magic")) do
+        for _, item in ipairs(group.children or {}) do
+            if resource == item.label or resource == item.plural then
+                local plural = amount and amount ~= "" and tonumber(amount) ~= 1
+                return plural and item.plural or item.label, true
+            end
+        end
+    end
+    return resource, false
 end
 
 function addon.SpellCreationPresets.GetRanges()
@@ -300,4 +332,73 @@ function addon.SpellCreationPresets.IsNoCooldown(value)
     local normalized = value:match("^%s*(.-)%s*$"):lower()
     return normalized == "keine" or normalized == "none" or normalized == "aucun"
         or normalized == addon.L("PRESET_COOLDOWN_NONE"):lower()
+end
+
+
+local customGroups = {
+    resource = true,
+    range = true,
+    magicType = true,
+    magicSchool = true,
+    debuffType = true,
+    damageType = true,
+}
+
+local function cleanCustomPreset(group, text)
+    if not customGroups[group] or type(text) ~= "string" then return end
+    text = addon.Runtime.Trim(text)
+    local limit = addon.Validators.Limits.MAX_SHORT_FIELD_LENGTH
+    if group == "resource" then limit = limit - 6 end
+    if text == "" or #text > limit or text:find("[%c|]") then return end
+    return text
+end
+
+function addon.SpellCreationPresets.GetCustomPresets(group)
+    local root = addon.Database.GetDB()
+    local settings = type(root) == "table" and root.settings
+    local all = type(settings) == "table" and settings.customPresets
+    local source = type(all) == "table" and all[group]
+    local result, seen = {}, {}
+    for index = 1, 3 do
+        local text = type(source) == "table"
+            and cleanCustomPreset(group, source[index])
+        if text and not seen[text] then
+            result[#result + 1], seen[text] = text, true
+        end
+    end
+    return result
+end
+
+function addon.SpellCreationPresets.SetCustomPreset(group, previous, text)
+    if not customGroups[group] then return false, "CUSTOM_PRESET_INVALID" end
+    local list = addon.SpellCreationPresets.GetCustomPresets(group)
+    local index
+    if previous then
+        for position, value in ipairs(list) do
+            if value == previous then index = position; break end
+        end
+        if not index then return false, "CUSTOM_PRESET_CHANGED" end
+    end
+    if text == nil then
+        if not index then return false, "CUSTOM_PRESET_INVALID" end
+        table.remove(list, index)
+    else
+        text = cleanCustomPreset(group, text)
+        if not text then return false, "CUSTOM_PRESET_INVALID" end
+        for position, value in ipairs(list) do
+            if value == text and position ~= index then
+                return false, "CUSTOM_PRESET_INVALID"
+            end
+        end
+        if not index and #list >= 3 then return false, "CUSTOM_PRESET_LIMIT" end
+        list[index or #list + 1] = text
+    end
+    local root = addon.Database.GetDB()
+    if type(root) ~= "table" then return false, "CUSTOM_PRESET_INVALID" end
+    if type(root.settings) ~= "table" then root.settings = {} end
+    if type(root.settings.customPresets) ~= "table" then
+        root.settings.customPresets = {}
+    end
+    root.settings.customPresets[group] = list
+    return true, text
 end

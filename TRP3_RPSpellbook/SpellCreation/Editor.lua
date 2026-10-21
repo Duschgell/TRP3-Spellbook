@@ -621,16 +621,173 @@ local function createDescriptionField(parent, topOffset)
     return field, label
 end
 
-local function setSimplePresetMenu(control, provider, onSelected, submenuProvider)
-    control.dropdown:SetupMenu(function(_, rootDescription)
-        for _, item in ipairs(provider()) do
-            local current = item
-            rootDescription:CreateButton(current.label, draftCallback(function()
-                control.field:SetText(current.label)
-                if onSelected then
-                    onSelected(current)
+local function addCustomPresets(rootDescription, control, group, onSelected)
+    if not group then return end
+    local presets = addon.SpellCreationPresets
+
+    local function selectText(text)
+        control.field:SetText(text)
+        if onSelected then onSelected({ label = text, allowsAmount = true }) end
+    end
+
+    local function addInput(parent, previous)
+        local expanded, placeholder = previous ~= nil, previous == nil
+        local draft = previous or "..."
+        parent:CreateFrame():AddInitializer(function(frame, description, menu)
+            local token = {}
+            frame.customPresetHoverToken = token
+            frame:EnableMouse(true)
+            description:SetOnLeave(nil)
+            description:SetOnEnter(function()
+                if not expanded then
+                    expanded = true
+                    menu:ReinitializeAll()
+                end
+            end)
+            if not expanded then
+                local hint = frame:AttachFontString()
+                hint:SetFontObject(addon.Theme.Fonts.small)
+                hint:SetText("...")
+                hint:SetTextColor(0.76, 0.69, 0.56)
+                hint:SetPoint("LEFT", frame, "LEFT", 10, 0)
+                return 208, 4
+            end
+
+            local input = frame:AttachFrame("EditBox")
+            input:SetFrameStrata(frame:GetFrameStrata())
+            input:SetFrameLevel(frame:GetFrameLevel() + 1)
+            input:SetSize(200, 24)
+            input:SetPoint("LEFT", frame, "LEFT", 4, 0)
+            input:SetAutoFocus(false)
+            input:SetFontObject(addon.Theme.Fonts.body)
+            input:SetTextColor(1, 1, 1, 1)
+            input:SetTextInsets(6, 6, 0, 0)
+            input:SetBlinkSpeed(0.5)
+
+            input:SetMaxBytes(
+                addon.Validators.Limits.MAX_SHORT_FIELD_LENGTH
+                    - (group == "resource" and 6 or 0)
+            )
+
+            input:EnableMouse(true)
+            input:SetText(draft)
+            input:SetScript("OnTextChanged", function(self) draft = self:GetText() 
+
+            end)
+
+            local line = frame:AttachTexture()
+            line:SetColorTexture(0.86, 0.66, 0.29, 0.35)
+            line:SetHeight(1)
+            line:SetPoint("BOTTOMLEFT", input, "BOTTOMLEFT", 0, 0)
+            line:SetPoint("BOTTOMRIGHT", input, "BOTTOMRIGHT", 0, 0)
+
+            local function collapse()
+                if previous then return end
+                C_Timer.After(0.15, function()
+                    if frame.customPresetHoverToken == token and menu:IsShown()
+                        and not input:HasFocus() and not frame:IsMouseOver()
+                        and (draft == "" or draft == "...")
+                    then
+                        expanded = false
+                        menu:ReinitializeAll()
+                    end
+                end)
+            end
+
+            description:SetOnLeave(collapse)
+            input:SetScript("OnLeave", collapse)
+            input:SetScript("OnEditFocusLost", collapse)
+            input:SetScript("OnEditFocusGained", function(self)
+
+                if placeholder then
+                    self:SetText("")
+                    placeholder = false
+                else
+                    self:HighlightText()
+                end
+            end)
+            input:SetScript("OnHide", function(self) self:ClearFocus() end)
+            input:SetScript("OnEscapePressed", function()
+                Menu.GetManager():CloseMenus()
+            end)
+            input:SetScript("OnEnterPressed", draftCallback(function(self)
+                if not dialog:IsShown() then return end
+                local ok, result = presets.SetCustomPreset(
+                    group, previous, self:GetText()
+                )
+                if not ok then setError(addon.L(result)); return end
+                setError(nil)
+                selectText(result)
+                Menu.GetManager():CloseMenus()
+                control.dropdown:GenerateMenu()
+            end))
+            return 208, 24
+        end)
+    end
+
+    local divider = rootDescription:CreateDivider()
+    divider:AddInitializer(function(frame)
+        frame.divider:SetHeight(1)
+        return 208, 1
+    end)
+
+    local list = presets.GetCustomPresets(group)
+    for _, value in ipairs(list) do
+        local text = value
+        local row = rootDescription:CreateButton(
+            text, draftCallback(function() selectText(text) end)
+        )
+        row:AddInitializer(function(button, description)
+            button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+            button:SetScript("OnClick", draftCallback(function(_, mouseButton)
+                if mouseButton == "RightButton" then
+                    TRP3_MenuUtil.CreateContextMenu(
+                        control.dropdown, function(_, context)
+                            addInput(context:CreateButton(
+                                addon.L("CUSTOM_PRESET_RENAME")
+                            ), text)
+                            context:CreateButton(
+                                addon.L("DELETE"), draftCallback(function()
+                                    local ok, err = presets.SetCustomPreset(
+                                        group, text, nil
+                                    )
+                                    if not ok then
+                                        setError(addon.L(err))
+                                        return
+                                    end
+                                    setError(nil)
+                                    control.dropdown:GenerateMenu()
+                                end)
+                            )
+                        end
+                    )
+                else
+                    description:Pick(MenuInputContext.MouseButton, mouseButton)
                 end
             end))
+        end)
+    end
+    if #list < 3 then addInput(rootDescription) end
+end
+
+local function setSimplePresetMenu(control, provider, onSelected, submenuProvider, customGroup)
+    control.dropdown:SetupMenu(function(_, rootDescription)
+        for _, item in ipairs(provider()) do
+            if not item.custom then
+                local parent = item.children
+                    and rootDescription:CreateButton(item.label)
+                    or rootDescription
+                for _, entry in ipairs(item.children or { item }) do
+                    local current = entry
+                    local label = current.color
+                        and "|cff" .. current.color .. current.label .. "|r"
+                        or current.label
+                    parent:CreateButton(label, draftCallback(function()
+                        control.field:SetText(current.label)
+                        if onSelected then onSelected(current) end
+                    end))
+                end
+            end
         end
         if submenuProvider
             and addon.SpellCreationSettings.ShouldShowMagicSubtypes()
@@ -642,12 +799,11 @@ local function setSimplePresetMenu(control, provider, onSelected, submenuProvide
                 local current = item
                 submenu:CreateButton(current.label, draftCallback(function()
                     control.field:SetText(current.label)
-                    if onSelected then
-                        onSelected(current)
-                    end
+                    if onSelected then onSelected(current) end
                 end))
             end
         end
+        addCustomPresets(rootDescription, control, customGroup, onSelected)
     end)
 end
 
@@ -972,6 +1128,7 @@ end
 local function buildResource()
     local resource = trim(dialog.resourceControl.field:GetText())
     local amount = trim(dialog.resourceControl.amount:GetText())
+    resource = addon.SpellCreationPresets.FormatResource(resource, amount)
     if resource == "" then
         return ""
     end
@@ -1308,6 +1465,16 @@ local function createDialog()
     if effectMessagePreview.SetNonSpaceWrap then effectMessagePreview:SetNonSpaceWrap(true) end
     if effectMessagePreview.SetMaxLines then effectMessagePreview:SetMaxLines(3) end
     effectMessagePreview:Hide()
+
+    local function refreshResourceName()
+        local field = resourceControl.field
+        local text = addon.SpellCreationPresets.FormatResource(
+            field:GetText(), resourceControl.amount:GetText()
+        )
+        if text ~= field:GetText() then field:SetText(text) end
+    end
+    resourceControl.amount:HookScript("OnTextChanged", refreshResourceName)
+
     resourceControl.field:HookScript("OnTextChanged", function()
         if not state.applyingResourcePreset
             and not resourceControl.amount:IsEnabled()
@@ -1327,12 +1494,17 @@ local function createDialog()
             if item.allowsAmount == false then
                 resourceControl.amount:SetText("")
             end
+            refreshResourceName()
             state.applyingResourcePreset = false
-        end
+        end,
+        nil,
+        "resource"
     )
+
     setSimplePresetMenu(
-        rangeControl,
-        addon.SpellCreationPresets.GetRanges
+        rangeControl, addon.SpellCreationPresets.GetRanges,
+        nil, nil, 
+        "range"
     )
     setTimePresetMenu(
         castTimeControl,
@@ -1350,19 +1522,25 @@ local function createDialog()
         magicTypeControl,
         addon.SpellCreationPresets.GetMagicTypes,
         nil,
-        addon.SpellCreationPresets.GetMagicSubtypes
+        addon.SpellCreationPresets.GetMagicSubtypes,
+        "magicType"
     )
     setSimplePresetMenu(
-        magicSchoolControl,
-        addon.SpellCreationPresets.GetMagicSchools
+        magicSchoolControl, addon.SpellCreationPresets.GetMagicSchools,
+        nil, nil, 
+        "magicSchool"
     )
     setSimplePresetMenu(
         damageTypeControl,
-        addon.SpellCreationPresets.GetDamageTypes
+        addon.SpellCreationPresets.GetDamageTypes,
+        nil, nil, 
+        "damageType"
     )
     setSimplePresetMenu(
         debuffTypeControl,
-        addon.SpellCreationPresets.GetDebuffTypes
+        addon.SpellCreationPresets.GetDebuffTypes,
+        nil, nil, 
+        "debuffType"
     )
     magicTypeControl.field:HookScript("OnTextChanged", function()
         if dialog and dialog.iconButton then setSelectedIcon(state.icon) end
@@ -1501,10 +1679,9 @@ local function createDialog()
         range = rangeControl.field,
         resource = resourceControl.field,
     }
-    for _, field in pairs(frame.fields) do
-        attachFieldCursor(field)
-    end
-    attachFieldCursor(resourceControl.amount)
+
+    attachFieldCursor(description)
+
     frame.durationControl = durationControl
     frame.effectMessageLabel = effectMessageLabel
     frame.effectMessagePreview = effectMessagePreview
@@ -1591,6 +1768,11 @@ end
 
 local function splitResource(value, kind)
     local text = trim(value)
+    local amount, resource = text:match("^(%d+)%s+(.+)$")
+    local formatted, essence = addon.SpellCreationPresets.FormatResource(resource or text, amount or "")
+    if essence then return amount or "", formatted, true 
+    end
+
     for _, item in ipairs(addon.SpellCreationPresets.GetResources(kind)) do
         if text == item.label then
             return "", text, item.allowsAmount

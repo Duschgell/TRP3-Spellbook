@@ -1154,6 +1154,20 @@ local migrations = {
     [3] = repairAtEnd, [4] = repairAtEnd, [5] = repairAtEnd,
     [6] = repairAtEnd, [7] = repairAtEnd, [8] = repairAtEnd,
     [9] = repairAtEnd, [10] = repairAtEnd,
+    [11] = function(database)
+        for _, profile in pairs(database.profiles) do
+            local book = type(profile) == "table" and profile.spellbook
+            if type(book) == "table" and type(book.icon) == "string" then
+                local icon = book.icon:lower():gsub("\\", "/")
+                if icon == "inv_misc_book_09"
+                    or icon == "interface/icons/inv_misc_book_09"
+                then
+                    book.icon = addon.Constants.DEFAULT_BOOK_ICON
+                end
+            end
+        end
+        return true
+    end,
 }
 
 function addon.Schema.InitializeDatabase(database)

@@ -2,12 +2,12 @@ local addonName, addon = ...
 
 addon.Constants = {
     ADDON_NAME = addonName,
-    ADDON_VERSION = "1.0",
-    DATABASE_SCHEMA_VERSION = 11,
-    DEFAULT_BOOK_ICON = "Interface\\Icons\\INV_Misc_Book_09",
+    ADDON_VERSION = "1.1",
+    DATABASE_SCHEMA_VERSION = 12,
+    DEFAULT_BOOK_ICON = "Interface\\Icons\\INV_Misc_Book_07",
     DEFAULT_BOOK_NAME = "Spellbook",
-    DEFAULT_TRP3_TOOLBAR_ICON = "INV_Misc_Book_09",
-    DEFAULT_TAB_ICON = "Interface\\Icons\\INV_Misc_Book_09",
+    DEFAULT_TRP3_TOOLBAR_ICON = "INV_Misc_Book_07",
+    DEFAULT_TAB_ICON = "Interface\\Icons\\INV_Misc_Book_07",
     DEFAULT_TAB_NAME = "General",
     DEFAULT_TAB_ID = "tab_general",
     CHARACTER_MENU_ID = "main_10_player",
