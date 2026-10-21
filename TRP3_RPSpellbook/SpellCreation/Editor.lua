@@ -624,13 +624,15 @@ end
 local function setSimplePresetMenu(control, provider, onSelected, submenuProvider)
     control.dropdown:SetupMenu(function(_, rootDescription)
         for _, item in ipairs(provider()) do
-            local current = item
-            rootDescription:CreateButton(current.label, draftCallback(function()
-                control.field:SetText(current.label)
-                if onSelected then
-                    onSelected(current)
-                end
-            end))
+            local parent = item.children and rootDescription:CreateButton(item.label) or rootDescription
+            for _, entry in ipairs(item.children or { item }) do
+                local current = entry
+                local label = current.color and "|cff" .. current.color .. current.label .. "|r" or current.label
+                parent:CreateButton(label, draftCallback(function()
+                    control.field:SetText(current.label)
+                    if onSelected then onSelected(current) end
+                end))
+            end
         end
         if submenuProvider
             and addon.SpellCreationSettings.ShouldShowMagicSubtypes()
@@ -972,6 +974,7 @@ end
 local function buildResource()
     local resource = trim(dialog.resourceControl.field:GetText())
     local amount = trim(dialog.resourceControl.amount:GetText())
+    resource = addon.SpellCreationPresets.FormatResource(resource, amount)
     if resource == "" then
         return ""
     end
@@ -1308,6 +1311,16 @@ local function createDialog()
     if effectMessagePreview.SetNonSpaceWrap then effectMessagePreview:SetNonSpaceWrap(true) end
     if effectMessagePreview.SetMaxLines then effectMessagePreview:SetMaxLines(3) end
     effectMessagePreview:Hide()
+
+    local function refreshResourceName()
+        local field = resourceControl.field
+        local text = addon.SpellCreationPresets.FormatResource(
+            field:GetText(), resourceControl.amount:GetText()
+        )
+        if text ~= field:GetText() then field:SetText(text) end
+    end
+    resourceControl.amount:HookScript("OnTextChanged", refreshResourceName)
+
     resourceControl.field:HookScript("OnTextChanged", function()
         if not state.applyingResourcePreset
             and not resourceControl.amount:IsEnabled()
@@ -1327,6 +1340,7 @@ local function createDialog()
             if item.allowsAmount == false then
                 resourceControl.amount:SetText("")
             end
+            refreshResourceName()
             state.applyingResourcePreset = false
         end
     )
@@ -1501,10 +1515,9 @@ local function createDialog()
         range = rangeControl.field,
         resource = resourceControl.field,
     }
-    for _, field in pairs(frame.fields) do
-        attachFieldCursor(field)
-    end
-    attachFieldCursor(resourceControl.amount)
+
+    attachFieldCursor(description)
+
     frame.durationControl = durationControl
     frame.effectMessageLabel = effectMessageLabel
     frame.effectMessagePreview = effectMessagePreview
@@ -1591,6 +1604,11 @@ end
 
 local function splitResource(value, kind)
     local text = trim(value)
+    local amount, resource = text:match("^(%d+)%s+(.+)$")
+    local formatted, essence = addon.SpellCreationPresets.FormatResource(resource or text, amount or "")
+    if essence then return amount or "", formatted, true 
+    end
+
     for _, item in ipairs(addon.SpellCreationPresets.GetResources(kind)) do
         if text == item.label then
             return "", text, item.allowsAmount
