@@ -1005,6 +1005,11 @@ addon.Localization.Register("enUS", {
     PRESET_VALUE_HALF = "0.5",
     PRESET_VALUE_ONE_HALF = "1.5",
 
+    CUSTOM_PRESET_RENAME = "Rename",
+    CUSTOM_PRESET_INVALID = "This name is invalid or already in use.",
+    CUSTOM_PRESET_LIMIT = "You can save up to three custom entries per category.",
+    CUSTOM_PRESET_CHANGED = "This entry has changed. Open it again.",
+
     PREVIEW_PROFILE = "Empty spellbook",
 
     PROFILE_PREFIX = "Active Total RP 3 profile: ",
