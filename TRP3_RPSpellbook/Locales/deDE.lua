@@ -1005,6 +1005,11 @@ addon.Localization.Register("deDE", {
     PRESET_VALUE_HALF = "0,5",
     PRESET_VALUE_ONE_HALF = "1,5",
 
+    CUSTOM_PRESET_RENAME = "Umbenennen",
+    CUSTOM_PRESET_INVALID = "Der Name ist ungültig oder bereits vergeben.",
+    CUSTOM_PRESET_LIMIT = "Du kannst höchstens drei eigene Einträge pro Kategorie speichern.",
+    CUSTOM_PRESET_CHANGED = "Der Eintrag wurde geändert. Öffne es erneut.",
+
     PREVIEW_PROFILE = "Leeres Zauberbuch",
 
     PROFILE_PREFIX = "Aktives Total RP 3 Profil: ",

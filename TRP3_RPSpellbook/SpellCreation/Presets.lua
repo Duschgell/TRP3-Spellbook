@@ -167,7 +167,13 @@ local function localize(options)
 end
 
 function addon.SpellCreationPresets.GetResources(kind)
-    return localize(resources[kind] or resources.magic)
+    local result = localize(resources[kind] or resources.magic)
+    for _, text in ipairs(addon.SpellCreationPresets.GetCustomPresets("resource")) do
+        result[#result + 1] = {
+            value = text, label = text, allowsAmount = true, custom = true,
+        }
+    end
+    return result
 end
 
 function addon.SpellCreationPresets.FormatResource(resource, amount)
@@ -326,4 +332,73 @@ function addon.SpellCreationPresets.IsNoCooldown(value)
     local normalized = value:match("^%s*(.-)%s*$"):lower()
     return normalized == "keine" or normalized == "none" or normalized == "aucun"
         or normalized == addon.L("PRESET_COOLDOWN_NONE"):lower()
+end
+
+
+local customGroups = {
+    resource = true,
+    range = true,
+    magicType = true,
+    magicSchool = true,
+    debuffType = true,
+    damageType = true,
+}
+
+local function cleanCustomPreset(group, text)
+    if not customGroups[group] or type(text) ~= "string" then return end
+    text = addon.Runtime.Trim(text)
+    local limit = addon.Validators.Limits.MAX_SHORT_FIELD_LENGTH
+    if group == "resource" then limit = limit - 6 end
+    if text == "" or #text > limit or text:find("[%c|]") then return end
+    return text
+end
+
+function addon.SpellCreationPresets.GetCustomPresets(group)
+    local root = addon.Database.GetDB()
+    local settings = type(root) == "table" and root.settings
+    local all = type(settings) == "table" and settings.customPresets
+    local source = type(all) == "table" and all[group]
+    local result, seen = {}, {}
+    for index = 1, 3 do
+        local text = type(source) == "table"
+            and cleanCustomPreset(group, source[index])
+        if text and not seen[text] then
+            result[#result + 1], seen[text] = text, true
+        end
+    end
+    return result
+end
+
+function addon.SpellCreationPresets.SetCustomPreset(group, previous, text)
+    if not customGroups[group] then return false, "CUSTOM_PRESET_INVALID" end
+    local list = addon.SpellCreationPresets.GetCustomPresets(group)
+    local index
+    if previous then
+        for position, value in ipairs(list) do
+            if value == previous then index = position; break end
+        end
+        if not index then return false, "CUSTOM_PRESET_CHANGED" end
+    end
+    if text == nil then
+        if not index then return false, "CUSTOM_PRESET_INVALID" end
+        table.remove(list, index)
+    else
+        text = cleanCustomPreset(group, text)
+        if not text then return false, "CUSTOM_PRESET_INVALID" end
+        for position, value in ipairs(list) do
+            if value == text and position ~= index then
+                return false, "CUSTOM_PRESET_INVALID"
+            end
+        end
+        if not index and #list >= 3 then return false, "CUSTOM_PRESET_LIMIT" end
+        list[index or #list + 1] = text
+    end
+    local root = addon.Database.GetDB()
+    if type(root) ~= "table" then return false, "CUSTOM_PRESET_INVALID" end
+    if type(root.settings) ~= "table" then root.settings = {} end
+    if type(root.settings.customPresets) ~= "table" then
+        root.settings.customPresets = {}
+    end
+    root.settings.customPresets[group] = list
+    return true, text
 end

@@ -1005,6 +1005,11 @@ addon.Localization.Register("frFR", {
     PRESET_VALUE_HALF = "0,5",
     PRESET_VALUE_ONE_HALF = "1,5",
 
+    CUSTOM_PRESET_RENAME = "Renommer",
+    CUSTOM_PRESET_INVALID = "Ce nom est invalide ou déjà utilisé.",
+    CUSTOM_PRESET_LIMIT = "Vous pouvez enregistrer jusqu'à trois entrées personnalisées par catégorie.",
+    CUSTOM_PRESET_CHANGED = "Cette entrée a été modifiée. Ouvrez à nouveau.",
+
     PREVIEW_PROFILE = "Grimoire vide",
 
     PROFILE_PREFIX = "Profil Total RP 3 actif : ",
