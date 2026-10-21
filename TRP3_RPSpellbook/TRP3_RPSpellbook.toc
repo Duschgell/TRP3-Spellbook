@@ -1,0 +1,131 @@
+## Interface: 120100
+## Title: TRP3 Spellbook
+## Notes: A roleplay spellbook for Total RP 3.
+## Title-deDE: TRP3 Spellbook
+## Title-frFR: TRP3 Spellbook
+## Notes-frFR: Grimoire de jeu de rôle pour Total RP 3.
+## Notes-deDE: Ein Rollenspiel Zauberbuch für Total RP 3.
+## Author: Duschgell, Codex
+## Version: 1.0
+## RequiredDeps: totalRP3
+## OptionalDeps: totalRP3_Extended, totalRP3_KuiNameplates
+## SavedVariables: TRP3_RPSpellbookDB
+
+Constants.lua
+Core\Modules.lua
+Core\ConstantsExtension.lua
+Localization.lua
+Locales\enUS.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Bindings.lua
+Logger.lua
+Core\Runtime.lua
+Core\Cache.lua
+Core\Onboarding.lua
+Core\TutorialExamples.lua
+Core\TutorialEncounter.lua
+TRP3Bridge.lua
+Integrations\NPCMarkers.lua
+GameMaster\GroupRoster.lua
+GameMaster\SceneAccess.lua
+SpellCreation\Presets.lua
+SpellCreation\Settings.lua
+SpellCreation\Themes.lua
+SpellCreation\Presentation.lua
+GameMaster\Settings.lua
+Data\Validators.lua
+GameMaster\NPCActors.lua
+Data\DeflateGuard.lua
+Data\ExportCodec.lua
+Data\PortableTable.lua
+Data\Export.lua
+Data\Import.lua
+Data\Schema.lua
+Data\Search.lua
+Data\ReferenceIndex.lua
+Database.lua
+Data\DatabaseHardening.lua
+Data\BackupValidation.lua
+Data\Backup.lua
+Data\OnboardingState.lua
+Data\TimedEffects.lua
+Data\EffectVisibility.lua
+Data\ImportedLibrary.lua
+Data\ArchiveCopy.lua
+GameMaster\PlayerState.lua
+Data\SoundCatalog.lua
+GameMaster\TurnSound.lua
+GameMaster\ActionCollection.lua
+GameMaster\SessionStore.lua
+GameMaster\Layout.lua
+GameMaster\ActionPresentation.lua
+GameMaster\ParticipantPresentation.lua
+GameMaster\Visibility.lua
+GameMaster\IncomingActions.lua
+GameMaster\Delegation.lua
+Events.lua
+Communication\Transport.lua
+Communication\Protocol.lua
+Communication\GameMaster.lua
+GameMaster\Service.lua
+GameMaster\TestMode.lua
+GameMaster\DelayedSubmission.lua
+GameMaster\Preparation.lua
+Chat\Links.lua
+Chat\Insert.lua
+Chat\Fallbacks.lua
+Core\WhisperTemplates.lua
+GameMaster\Effects.lua
+Core\TimedEffects.lua
+GameMaster\TimedEffects.lua
+Core\EffectDisplay.lua
+Chat\EffectSharing.lua
+Integrations\ExtendedAuras.lua
+Integrations\CurrentlyEffects.lua
+Integrations\QuickAccess.lua
+Communication\Hover.lua
+UI\PlayerTooltip.lua
+UI\Theme.lua
+UI\UIFactory.lua
+UI\GameMasterWidgets.lua
+UI\GameMasterActionList.lua
+UI\GameMasterNPCTooltip.lua
+UI\SpellWhisperDialog.lua
+UI\TimedEffects.lua
+UI\ExportWindow.lua
+UI\SpellTooltip.lua
+SpellCreation\Editor.lua
+UI\TabEditor.lua
+UI\BookLayout.lua
+UI\EffectIcons.lua
+UI\EffectSurfaces.lua
+UI\CurrentlyEffectsEditor.lua
+UI\BookMagicEffects.lua
+UI\BookMagic.lua
+UI\SpellDetailsView.lua
+UI\ArchiveCopyDialog.lua
+UI\ImportWindow.lua
+UI\BackupWindow.lua
+UI\ImportedBooksWindow.lua
+UI\SpellLinkWindow.lua
+UI\GameMasterActionStatus.lua
+UI\GameMasterActionDialogV2.lua
+UI\GameMasterVisibilityButton.lua
+UI\GameMasterSharedActions.lua
+UI\GameMasterCompactSpellbook.lua
+UI\SoundBrowser.lua
+UI\GameMasterLayoutEditor.lua
+UI\BookAnimation.lua
+UI\BookScene.lua
+UI\FancyBookControls.lua
+UI\SpellbookPanel.lua
+UI\ImportedLibraryPanel.lua
+Chat\Hyperlinks.lua
+UI\SpellbookWindow.lua
+UI\BookNavigationStyle.lua
+UI\TRP3Integration.lua
+UI\TutorialView.lua
+UI\TutorialPractice.lua
+UI\TutorialTours.lua
+Core.lua

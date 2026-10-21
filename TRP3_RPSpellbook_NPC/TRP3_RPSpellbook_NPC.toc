@@ -1,0 +1,20 @@
+## Interface: 120100
+## Title: TRP3 Spellbook: NPC Register
+## Title-deDE: TRP3 Spellbook: NPC-Register
+## Title-frFR: TRP3 Spellbook: Registre des PNJ
+## Notes-frFR: Gérer les profils de PNJ et leurs capacités dans Total RP 3.
+## Notes: Manage NPC profiles and their roleplay abilities in Total RP 3.
+## Notes-deDE: NPC-Profile und Fähigkeiten in Total RP 3 verwalten.
+## Author: Duschgell, Codex
+## Version: 1.0
+## RequiredDeps: TRP3_RPSpellbook
+## SavedVariables: TRP3_RPSpellbookNPCDB
+
+NPC\Bootstrap.lua
+NPC\Locales.lua
+NPC\Domain.lua
+NPC\Register.lua
+NPC\Transfer.lua
+NPC\Engine.lua
+NPC\UI.lua
+NPC\Module.lua

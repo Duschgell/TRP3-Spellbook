@@ -1,0 +1,8 @@
+<Bindings>
+    <Binding name="TRP3RPSPELLBOOK_OPEN" category="BINDING_HEADER_TRP3RPSPELLBOOK">
+        TRP3_RPSpellbook_OpenBinding()
+    </Binding>
+    <Binding name="TRP3RPSPELLBOOK_COMPACT" category="BINDING_HEADER_TRP3RPSPELLBOOK">
+        TRP3_RPSpellbook_CompactBinding()
+    </Binding>
+</Bindings>

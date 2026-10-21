@@ -1,0 +1,20 @@
+## Interface: 120100
+## Title: TRP3 Spellbook: Game Master
+## Title-deDE: TRP3 Spellbook: Spielleiter
+## Title-frFR: TRP3 Spellbook: Maître du jeu
+## Notes-frFR: Diriger des scènes de jeu de rôle.
+## Notes: Run roleplay encounters.
+## Notes-deDE: Rollenspielkämpfe leiten.
+## Author: Duschgell, Codex
+## Version: 1.0
+## RequiredDeps: TRP3_RPSpellbook
+
+Modules\GameMasterBootstrap.lua
+UI\GameMasterNPCDialog.lua
+UI\GameMasterTestDialog.lua
+UI\GameMasterSceneSettingsDialog.lua
+UI\GameMasterHistoryWindow.lua
+UI\GameMasterSessionDialog.lua
+UI\GameMasterAssistantsDialog.lua
+UI\GameMasterWindow.lua
+Modules\GameMaster.lua
