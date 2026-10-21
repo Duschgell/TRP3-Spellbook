@@ -1501,10 +1501,9 @@ local function createDialog()
         range = rangeControl.field,
         resource = resourceControl.field,
     }
-    for _, field in pairs(frame.fields) do
-        attachFieldCursor(field)
-    end
-    attachFieldCursor(resourceControl.amount)
+
+    attachFieldCursor(description)
+
     frame.durationControl = durationControl
     frame.effectMessageLabel = effectMessageLabel
     frame.effectMessagePreview = effectMessagePreview
