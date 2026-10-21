@@ -23,6 +23,16 @@ local resources = {
         option("maelstrom", "PRESET_RESOURCE_MAELSTROM", { allowsAmount = true }),
         option("runic_power", "PRESET_RESOURCE_RUNIC_POWER", { allowsAmount = true }),
         option("soul_shards", "PRESET_RESOURCE_SOUL_SHARDS", { allowsAmount = true }),
+        option("essence", "PRESET_RESOURCE_ESSENCE", {
+            children = {
+                option("essence", "PRESET_RESOURCE_ESSENCE", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_PLURAL" }),
+                option("red_essence", "PRESET_RESOURCE_ESSENCE_RED", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_RED_PLURAL", color = "ff0000" }),
+                option("blue_essence", "PRESET_RESOURCE_ESSENCE_BLUE", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_BLUE_PLURAL", color = "0070dd" }),
+                option("black_essence", "PRESET_RESOURCE_ESSENCE_BLACK", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_BLACK_PLURAL", color = "4f2e00" }),
+                option("bronze_essence", "PRESET_RESOURCE_ESSENCE_BRONZE", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_BRONZE_PLURAL", color = "ff9300" }),
+                option("green_essence", "PRESET_RESOURCE_ESSENCE_GREEN", { allowsAmount = true, pluralKey = "PRESET_RESOURCE_ESSENCE_GREEN_PLURAL", color = "00ff00" }),
+            },
+        }),
         option("reagents", "PRESET_RESOURCE_REAGENTS", { allowsAmount = false }),
     },
     ability = {
@@ -96,6 +106,7 @@ local magicTypes = {
 
 local magicSubtypes = {
     option("runes", "PRESET_MAGIC_RUNES"),
+    option("prismatic", "PRESET_MAGIC_PRISMATIC"),
     option("technomancy", "PRESET_MAGIC_TECHNOMANCY"),
     option("blood", "PRESET_MAGIC_BLOOD"),
     option("chronomancy", "PRESET_MAGIC_CHRONOMANCY"),
@@ -142,6 +153,9 @@ local function localize(options)
     for index, item in ipairs(options or {}) do
         localized[index] = {
             allowsAmount = item.allowsAmount,
+            children = item.children and localize(item.children) or nil,
+            color = item.color,
+            plural = item.pluralKey and addon.L(item.pluralKey) or nil,
             exclusive = item.exclusive,
             label = addon.L(item.labelKey),
             order = item.order,
@@ -154,6 +168,18 @@ end
 
 function addon.SpellCreationPresets.GetResources(kind)
     return localize(resources[kind] or resources.magic)
+end
+
+function addon.SpellCreationPresets.FormatResource(resource, amount)
+    for _, group in ipairs(addon.SpellCreationPresets.GetResources("magic")) do
+        for _, item in ipairs(group.children or {}) do
+            if resource == item.label or resource == item.plural then
+                local plural = amount and amount ~= "" and tonumber(amount) ~= 1
+                return plural and item.plural or item.label, true
+            end
+        end
+    end
+    return resource, false
 end
 
 function addon.SpellCreationPresets.GetRanges()
