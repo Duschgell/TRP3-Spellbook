@@ -6,7 +6,7 @@
 ## Notes: Manage NPC profiles and their roleplay abilities in Total RP 3.
 ## Notes-deDE: NPC-Profile und Fähigkeiten in Total RP 3 verwalten.
 ## Author: Duschgell, Codex
-## Version: 1.0
+## Version: 1.1
 ## RequiredDeps: TRP3_RPSpellbook
 ## SavedVariables: TRP3_RPSpellbookNPCDB
 

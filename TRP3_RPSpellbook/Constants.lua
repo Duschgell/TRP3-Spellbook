@@ -2,7 +2,7 @@ local addonName, addon = ...
 
 addon.Constants = {
     ADDON_NAME = addonName,
-    ADDON_VERSION = "1.0",
+    ADDON_VERSION = "1.1",
     DATABASE_SCHEMA_VERSION = 12,
     DEFAULT_BOOK_ICON = "Interface\\Icons\\INV_Misc_Book_07",
     DEFAULT_BOOK_NAME = "Spellbook",

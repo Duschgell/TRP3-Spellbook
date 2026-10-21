@@ -6,7 +6,7 @@
 ## Notes: Run roleplay encounters.
 ## Notes-deDE: Rollenspielkämpfe leiten.
 ## Author: Duschgell, Codex
-## Version: 1.0
+## Version: 1.1
 ## RequiredDeps: TRP3_RPSpellbook
 
 Modules\GameMasterBootstrap.lua

@@ -6,7 +6,7 @@
 ## Notes-frFR: Grimoire de jeu de rôle pour Total RP 3.
 ## Notes-deDE: Ein Rollenspiel Zauberbuch für Total RP 3.
 ## Author: Duschgell, Codex
-## Version: 1.0
+## Version: 1.1
 ## RequiredDeps: totalRP3
 ## OptionalDeps: totalRP3_Extended, totalRP3_KuiNameplates
 ## SavedVariables: TRP3_RPSpellbookDB
