@@ -1,0 +1,84 @@
+name: Addon Tests
+
+on:
+  pull_request:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: addon-tests-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  addon-check:
+    name: Addon check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare check tools
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y lua5.1 libxml2-utils
+
+          tool_dir="$(mktemp -d "$RUNNER_TEMP/addon-check.XXXXXX")"
+          archive="$tool_dir/actionlint.tar.gz"
+
+          curl --fail --location --silent --show-error --retry 3 \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            --output "$archive"
+
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" |
+            sha256sum --check --strict
+
+          tar -xzf "$archive" -C "$tool_dir" -- actionlint
+          printf '%s\n' "$tool_dir" >> "$GITHUB_PATH"
+
+      - name: Test release builder
+        shell: bash
+        run: python3 -I -B -m unittest discover -s .tools/ci/tests -p 'test_*.py' -v
+
+      - name: Check addon files and workflow
+        shell: bash
+        run: python3 -I -B .tools/ci/addon_check.py .
+
+  addon-tests:
+    name: Addon tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare test runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y lua5.1
+
+          lua5.1 -v
+          dpkg-query --show --showformat='${binary:Package} ${Version}\n' lua5.1
+
+      - name: Run tests
+        shell: bash
+        run: python3 -I -B .tools/ci/run_tests.py
