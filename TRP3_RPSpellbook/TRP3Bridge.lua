@@ -872,17 +872,18 @@ local function getTooltipColor(api, hex, fallback)
     return fallback
 end
 
-local function getTooltipIconMarkup(icon)
-    local resolved = addon.TRP3Bridge.ResolveIconTexture(icon or addon.Constants.DEFAULT_BOOK_ICON)
+function addon.TRP3Bridge.GetTooltipIconMarkup(icon)
+    local resolved = addon.TRP3Bridge.ResolveIconTexture(icon)
+        or addon.TRP3Bridge.ResolveIconTexture(addon.Constants.DEFAULT_BOOK_ICON)
     if resolved == nil then
         return ""
     end
 
-    local texture = tostring(resolved):gsub("[|:]", "")
+    local texture = tostring(resolved):gsub("[|:%c]", "")
     if texture == "" then
         return ""
     end
-    return "|T" .. texture .. ":25:25|t "
+    return "|T" .. texture .. ":32:32|t "
 end
 
 local function buildSpellChatTooltip(api, snapshot)
@@ -894,7 +895,7 @@ local function buildSpellChatTooltip(api, snapshot)
     local tooltipLines = api.ChatLinkTooltipLines()
     local name = addon.ChatLinks.SanitizeDisplayName(spell.name)
     local nameColor = type(spell.nameColor) == "string" and spell.nameColor or "FFFFFF"
-    tooltipLines:SetTitle(getTooltipIconMarkup(spell.icon) .. "|cff" .. nameColor .. name .. "|r")
+    tooltipLines:SetTitle(addon.TRP3Bridge.GetTooltipIconMarkup(spell.icon) .. "|cff" .. nameColor .. name .. "|r")
 
     local white = api.Colors.White
     local yellow = api.Colors.Yellow
