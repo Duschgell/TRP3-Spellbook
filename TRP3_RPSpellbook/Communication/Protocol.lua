@@ -185,6 +185,7 @@ local function copyPeer(peer)
     end
     return {
         addonVersion = peer.addonVersion,
+        releaseNotes = addon.ReleaseNotes and addon.ReleaseNotes.Copy(peer.releaseNotes),
         capabilities = capabilities,
         lastSeen = peer.lastSeen,
         playerID = peer.playerID,
@@ -228,6 +229,7 @@ local function rememberPeer(sender, payload)
             <= constants.COMMUNICATION_PEER_TTL
     local peer = {
         addonVersion = addonVersion,
+        releaseNotes = addon.ReleaseNotes and addon.ReleaseNotes.Copy(payload.releaseNotes),
         capabilities = capabilities,
         capabilitySet = capabilitiesToSet(capabilities),
         lastSeen = addon.Runtime.GetMonotonicTime(),
@@ -241,6 +243,7 @@ local function rememberPeer(sender, payload)
         or not previousWasFresh
         or previous.addonVersion ~= peer.addonVersion
         or previous.protocolVersion ~= peer.protocolVersion
+        or addon.ReleaseNotes and not addon.ReleaseNotes.Same(previous.releaseNotes, peer.releaseNotes)
         or table.concat(previous.capabilities, "\031") ~= table.concat(peer.capabilities, "\031")
     then
         notifyPeerListeners(peer)
@@ -251,6 +254,7 @@ end
 local function createHelloPayload(replyRequested)
     return {
         addonVersion = constants.ADDON_VERSION,
+        releaseNotes = addon.ReleaseNotes and addon.ReleaseNotes.GetCurrent(),
         capabilities = getLocalCapabilities(),
         protocolVersion = constants.COMMUNICATION_PROTOCOL_VERSION,
         replyRequested = replyRequested == true,
