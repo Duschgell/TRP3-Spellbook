@@ -86,6 +86,9 @@ local function cleanRP(data)
     if result.name == "" or result.resource:find("[%d%%]") then return nil end
     if data.kind ~= "" and data.kind ~= "magic" and data.kind ~= "ability" then return nil end
     result.kind = data.kind
+    if addon.SpellCreationPresets and addon.SpellCreationPresets.NormalizeSpell then
+        addon.SpellCreationPresets.NormalizeSpell(result)
+    end
     return result
 end
 
@@ -482,8 +485,10 @@ function archive.MakeDraft(spellID, engine)
         range = (engine.minRange and engine.minRange > 0 and (engine.minRange .. "-") or "")
             .. engine.maxRange .. " yd"
     end
-    return { name = engine.name or ("Spell " .. spellID), icon = engine.icon or "", kind = "",
+    local draft = { name = engine.name or ("Spell " .. spellID), icon = engine.icon or "", kind = "",
         resource = engine.resource or "", range = range, castTime = cast, description = "" }
+    if presets.NormalizeSpell then presets.NormalizeSpell(draft) end
+    return draft
 end
 
  

@@ -115,6 +115,9 @@ local function normalizeSpell(spell, spellID, timestamp)
     end
     normalizeTags(spell)
     normalizeEffects(spell)
+    if addon.SpellCreationPresets and addon.SpellCreationPresets.NormalizeSpell then
+        addon.SpellCreationPresets.NormalizeSpell(spell)
+    end
 
     spell.createdAt = normalizeMetadata(spell.createdAt, timestamp)
     spell.updatedAt = math.max(
@@ -276,6 +279,17 @@ local function normalizeProfiles(database)
                 profileData.spellbook = createDefaultSpellbook(profileKey)
             end
             addon.Schema.NormalizeSpellbook(profileData.spellbook, profileKey)
+            local effects = type(profileData.timedEffects) == "table" and profileData.timedEffects
+            local presets = addon.SpellCreationPresets
+            if effects and presets and presets.NormalizeSpell then
+                for _, entry in pairs(type(effects.entries) == "table" and effects.entries or {}) do
+                    if type(entry) == "table" then presets.NormalizeSpell(entry.spell) end
+                end
+                for _, transfer in pairs(type(effects.transfers) == "table" and effects.transfers or {}) do
+                    local entry = type(transfer) == "table" and transfer.entry
+                    if type(entry) == "table" then presets.NormalizeSpell(entry.spell) end
+                end
+            end
         end
     end
 end
@@ -1213,6 +1227,13 @@ function addon.Schema.InitializeDatabase(database)
     end
 
     normalizeProfiles(database)
+    if addon.SpellCreationPresets and addon.SpellCreationPresets.NormalizeSpell then
+        for _, book in pairs(database.importedBooks) do
+            if type(book) == "table" and type(book.spells) == "table" then
+                for _, spell in pairs(book.spells) do addon.SpellCreationPresets.NormalizeSpell(spell) end
+            end
+        end
+    end
     normalizeGameMaster(database)
     database.schemaVersion = currentVersion
     database.addonVersion = addon.Constants.ADDON_VERSION
