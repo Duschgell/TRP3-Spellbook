@@ -929,22 +929,35 @@ local function buildSpellChatTooltip(api, snapshot)
 end
 
 local function getSpellChatIdentifierStem(name)
-     
-     
-     
-     
-    return addon.ChatLinks.EncodeTransportName(name, 175) .. "-rpsb"
+    return addon.ChatLinks.GetNativeName(name)
 end
 
 local function getSnapshotChatStem(snapshot)
     local stem = type(snapshot) == "table" and snapshot.effectLinkStem
-    if type(stem) == "string" and #stem <= 180 and stem:match("^[%w%._%%%-]+$")
-        and stem:match("%-rpsba%-%d+%-%d+%-%x+$") then return stem end
     local spell = type(snapshot) == "table" and snapshot.spell
-    return getSpellChatIdentifierStem(type(spell) == "table" and spell.name or addon.L("UNKNOWN_ABILITY"))
+    local name = getSpellChatIdentifierStem(type(spell) == "table" and spell.name or addon.L("UNKNOWN_ABILITY"))
+    if type(stem) == "string" and #stem <= 180
+        and stem:match("^(.-)%-rpsba%-%d+%-%d+%-%x+$") == name then return stem end
+    return name
+end
+
+local function installSpellChatIdentifierLookup(manager)
+    local original = manager.GetSentLinkForIdentifier
+    function manager:GetSentLinkForIdentifier(identifier, ...)
+        local link = original(self, identifier, ...)
+        if link then return link end
+        local originalIdentifier = addon.ChatLinks.DecodeNativeIdentifier(identifier)
+        if not originalIdentifier then return nil end
+        link = original(self, originalIdentifier, ...)
+        if type(link) == "table" and type(link.GetModuleID) == "function"
+            and type(link.GetIdentifier) == "function"
+            and link:GetModuleID() == addon.Constants.CHAT_LINK_MODULE_ID
+            and link:GetIdentifier() == identifier then return link end
+    end
 end
 
 function addon.TRP3Bridge.InitializeSpellChatLinks()
+    if addon.ChatAddonSupport then addon.ChatAddonSupport.Initialize() end
     if spellChatLinksModule then
         return true
     end
@@ -957,6 +970,8 @@ function addon.TRP3Bridge.InitializeSpellChatLinks()
         or type(api.Colors) ~= "table"
         or api.Colors.White == nil
         or api.Colors.Yellow == nil
+        or type(api.ChatLinksManager) ~= "table"
+        or type(api.ChatLinksManager.GetSentLinkForIdentifier) ~= "function"
     then
         return false, addon.L("CHAT_LINK_API_UNAVAILABLE")
     end
@@ -979,6 +994,7 @@ function addon.TRP3Bridge.InitializeSpellChatLinks()
         return buildSpellChatTooltip(api, snapshot)
     end
 
+    installSpellChatIdentifierLookup(api.ChatLinksManager)
     spellChatLinksModule = moduleOrError
     return true
 end
@@ -1008,6 +1024,17 @@ function addon.TRP3Bridge.CreateSpellChatLink(snapshot)
     if not success or type(linkOrError) ~= "table" or type(linkOrError.GetText) ~= "function" then
         return nil, linkOrError or addon.L("CHAT_LINK_API_UNAVAILABLE")
     end
+
+    if type(linkOrError.GetIdentifier) ~= "function" or type(linkOrError.SetIdentifier) ~= "function" then
+        return nil, addon.L("CHAT_LINK_API_UNAVAILABLE")
+    end
+    local identifierSuccess, identifier = pcall(linkOrError.GetIdentifier, linkOrError)
+    identifier = identifierSuccess and addon.ChatLinks.CreateNativeIdentifier(identifier, snapshot.effectLinkStem == name)
+    if not identifier then return nil, addon.L("CHAT_LINK_TOO_LONG") end
+    local renamed, renameError = pcall(linkOrError.SetIdentifier, linkOrError, identifier)
+    if not renamed then return nil, renameError or addon.L("CHAT_LINK_API_UNAVAILABLE") end
+    local lookupSuccess, registered = pcall(api.ChatLinksManager.GetSentLinkForIdentifier, api.ChatLinksManager, identifier)
+    if not lookupSuccess or registered ~= linkOrError then return nil, addon.L("CHAT_LINK_API_UNAVAILABLE") end
 
     local textSuccess, textOrError = pcall(linkOrError.GetText, linkOrError)
     if not textSuccess or type(textOrError) ~= "string" or textOrError == "" then
