@@ -27,12 +27,14 @@ LOAD_DEPENDENCIES = {
         "Chat/Fallbacks.lua", "Communication/Hover.lua", "UI/PlayerTooltip.lua",
         "SpellCreation/Editor.lua", "SpellCreation/Presentation.lua",
         "GameMaster/IncomingActions.lua",
+        "Data/ReleaseNotes.lua", "UI/VersionCheck.lua",
     ),
 
 
     "Core/ConstantsExtension.lua": (
         "Communication/Protocol.lua", "Communication/GameMaster.lua",
         "Chat/Fallbacks.lua", "Communication/Hover.lua", "UI/PlayerTooltip.lua",
+        "Data/ReleaseNotes.lua", "UI/VersionCheck.lua",
     ),
 
 
@@ -40,6 +42,7 @@ LOAD_DEPENDENCIES = {
         "Communication/Protocol.lua", "Communication/GameMaster.lua",
         "TRP3Bridge.lua", "Chat/Fallbacks.lua", "Communication/Hover.lua",
         "UI/PlayerTooltip.lua",
+        "UI/VersionCheck.lua",
     ),
 
 
@@ -51,6 +54,7 @@ LOAD_DEPENDENCIES = {
     "UI/UIFactory.lua": ("UI/TimedEffects.lua",),
     "Data/TimedEffects.lua": ("Core/TimedEffects.lua", "GameMaster/TimedEffects.lua"),
     "Data/EffectVisibility.lua": ("Chat/EffectSharing.lua",),
+    "Data/ReleaseNotes.lua": ("Communication/Protocol.lua", "UI/VersionCheck.lua"),
     "Localization.lua": ("Locales/enUS.lua", "Locales/deDE.lua", "Locales/frFR.lua"),
     "Locales/enUS.lua": ("Bindings.lua",),
     "Locales/deDE.lua": ("Bindings.lua",),

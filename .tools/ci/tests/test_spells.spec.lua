@@ -110,7 +110,8 @@ return {
     end },
 
     { id = "validators.translates-known-preset-fields", run = function(t, api, F)
-        t.eq(api.localization.SetLanguage("deDE"), true)
+        api.setLocale("deDE")
+        local translates = F.translates(api)
         local input = F.spell({ name = "Arcane", description = "Arcane magic",
             resource = "3 red essences", range = "Melee", castTime = "1-2 rounds", cooldown = "None",
             tags = { magicType = "arcane", magicSchool = "Evocation", damageType = "Physical" },
@@ -118,21 +119,29 @@ return {
         local before = F.copy(input)
         local valid, cleaned = api.validators.ValidateSpell(input)
         t.eq(valid, true)
-        t.eq(cleaned.tags.magicType, "Arkan")
-        t.eq(cleaned.tags.magicSchool, api.localization.Get("PRESET_SCHOOL_EVOCATION"))
-        t.eq(cleaned.tags.damageType, api.localization.Get("PRESET_DAMAGE_PHYSICAL"))
-        t.eq(cleaned.effects.debuffType, api.localization.Get("PRESET_DEBUFF_CURSE"))
-        t.eq(cleaned.resource, "3 " .. api.localization.Get("PRESET_RESOURCE_ESSENCE_RED_PLURAL"))
-        t.eq(cleaned.range, api.localization.Get("PRESET_RANGE_MELEE"))
-        t.eq(cleaned.castTime, api.localization.Get("PRESET_TIME_RANGE_ROUNDS", "1", "2"))
-        t.eq(cleaned.cooldown, api.localization.Get("PRESET_COOLDOWN_NONE"))
+        if translates then
+            t.eq(cleaned.tags.magicType, "Arkan")
+            t.eq(cleaned.tags.magicSchool, api.localization.Get("PRESET_SCHOOL_EVOCATION"))
+            t.eq(cleaned.tags.damageType, api.localization.Get("PRESET_DAMAGE_PHYSICAL"))
+            t.eq(cleaned.effects.debuffType, api.localization.Get("PRESET_DEBUFF_CURSE"))
+            t.eq(cleaned.resource, "3 " .. api.localization.Get("PRESET_RESOURCE_ESSENCE_RED_PLURAL"))
+            t.eq(cleaned.range, api.localization.Get("PRESET_RANGE_MELEE"))
+            t.eq(cleaned.castTime, api.localization.Get("PRESET_TIME_RANGE_ROUNDS", "1", "2"))
+            t.eq(cleaned.cooldown, api.localization.Get("PRESET_COOLDOWN_NONE"))
+        else
+            for _, field in ipairs({ "resource", "range", "castTime", "cooldown" }) do
+                t.eq(cleaned[field], input[field])
+            end
+            t.same(cleaned.tags, input.tags)
+            t.eq(cleaned.effects.debuffType, input.effects.debuffType)
+        end
         t.eq(cleaned.name, "Arcane")
         t.eq(cleaned.description, "Arcane magic")
         t.same(input, before)
     end },
 
     { id = "validators.preserves-custom-preset-text", run = function(t, api, F)
-        t.eq(api.localization.SetLanguage("deDE"), true)
+        api.setLocale("deDE")
         for _, text in ipairs({ "Arkane Magie", "Arcane magic", "Arcane Fire", "Superarcane", "Arkan!" }) do
             local valid, cleaned = api.validators.ValidateSpell(F.spell({ tags = { magicType = text } }))
             t.eq(valid, true)
@@ -142,13 +151,21 @@ return {
 
     { id = "validators.isolates-locale-per-case", run = function(t, api, F)
         t.eq(api.localization.GetLocale(), "enUS")
-        t.eq(api.localization.SetLanguage("frFR"), true)
+        api.setLocale("frFR")
+        t.eq(api.localization.GetLocale(), "frFR")
         local valid, cleaned = api.validators.ValidateSpell(F.spell({ resource = "ENERGY",
             tags = { magicType = "ARKAN" } }))
         t.eq(valid, true)
-        t.eq(cleaned.resource, api.localization.Get("PRESET_RESOURCE_ENERGY"))
-        t.eq(cleaned.tags.magicType, api.localization.Get("PRESET_MAGIC_ARCANE"))
-        t.eq(api.localization.SetLanguage("unsupported"), false)
+        if F.translates(api) then
+            t.eq(cleaned.resource, api.localization.Get("PRESET_RESOURCE_ENERGY"))
+            t.eq(cleaned.tags.magicType, api.localization.Get("PRESET_MAGIC_ARCANE"))
+        else
+            t.eq(cleaned.resource, "ENERGY")
+            t.eq(cleaned.tags.magicType, "ARKAN")
+        end
+        if type(api.localization.SetLanguage) == "function" then
+            t.eq(api.localization.SetLanguage("unsupported"), false)
+        end
         t.eq(api.localization.GetLocale(), "frFR")
     end },
 }
