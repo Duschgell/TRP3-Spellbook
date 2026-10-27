@@ -149,7 +149,7 @@ function privacy.PrepareLink(snapshot, effectID)
     if #ids == 0 then return nil end
     if count(state.shares) >= MAX_SHARES then return false end
     state.serial = state.serial + 1
-    local name = addon.ChatLinks.EncodeTransportName(snapshot.spell.name, 90)
+    local name = addon.ChatLinks.GetNativeName(snapshot.spell.name)
     local stem = name .. string.format("-rpsba-%d-%d-%08x", now(), state.serial, math.random(1, 2147483646))
     return { stem = stem, ids = ids, profile = addon.Database.GetActiveProfileKey() }
 end
@@ -157,9 +157,10 @@ end
 function privacy.BindLink(prepared, link)
     if not prepared then return true end
     local token = type(link) == "string" and link:match("^%[TRP3:([^%]]+)%]$")
+    local originalIdentifier = addon.ChatLinks.DecodeNativeIdentifier(token) or token
     local state = data()
     if not state or prepared.profile ~= addon.Database.GetActiveProfileKey() or not valid(token)
-        or token:sub(1, #prepared.stem + 1) ~= prepared.stem .. ":" then return false end
+        or originalIdentifier:sub(1, #prepared.stem + 1) ~= prepared.stem .. ":" then return false end
     state.shares[token] = { ids = prepared.ids, sent = false }
     return true
 end
@@ -169,10 +170,12 @@ function privacy.MarkSent(token)
     if not state or not valid(token) then return end
     if state.shares[token] then state.shares[token].sent = true; return end
      
-    local stem = token:match("^(.*):%d+$")
+    local originalIdentifier = addon.ChatLinks.DecodeNativeIdentifier(token) or token
+    local stem = originalIdentifier:match("^(.*):%d+$")
     if not stem or count(state.shares) >= MAX_SHARES then return end
     for previous, share in pairs(state.shares) do
-        if previous:match("^(.*):%d+$") == stem then
+        local previousIdentifier = addon.ChatLinks.DecodeNativeIdentifier(previous) or previous
+        if previousIdentifier:match("^(.*):%d+$") == stem then
             state.shares[token] = { ids = share.ids, sent = true }
             return
         end
@@ -199,7 +202,10 @@ end
 
 function privacy.ReceiveChat(player, token)
     local state = data()
-    if not state or not valid(player) or not valid(token) or not token:match("%-rpsba%-%d+%-%d+%-%x+:%d+$") then return false end
+    local originalIdentifier, private = addon.ChatLinks.DecodeNativeIdentifier(token)
+    if not state or not valid(player) or not valid(token)
+        or (originalIdentifier and not private)
+        or (not originalIdentifier and not token:match("%-rpsba%-%d+%-%d+%-%x+:%d+$")) then return false end
     local receipt = state.received[token]
     if receipt then return key(receipt.sender) == key(player) end
     if count(state.received) >= MAX_REMOTES then return false end

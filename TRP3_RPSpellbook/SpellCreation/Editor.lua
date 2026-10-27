@@ -1138,17 +1138,8 @@ local function buildResource()
     return resource
 end
 
-local function saveSpell()
-    if not dialog:IsShown() then return end
-    setError(nil)
-    if not checkBook() then return end
-    local book = getStorage().GetActiveSpellbook()
-    if not book.tabs[state.selectedTabID] then
-        setError(addon.L("INVALID_SELECTED_TAB"))
-        return
-    end
-    snapshotResource()
-    local data = {
+local function buildSpellData()
+    return {
         name = dialog.fields.name:GetText(),
         icon = state.icon,
         nameColor = state.nameColor,
@@ -1161,6 +1152,19 @@ local function saveSpell()
         tags = buildTags(),
         clearOptionalFields = true,
     }
+end
+
+local function saveSpell()
+    if not dialog:IsShown() then return end
+    setError(nil)
+    if not checkBook() then return end
+    local book = getStorage().GetActiveSpellbook()
+    if not book.tabs[state.selectedTabID] then
+        setError(addon.L("INVALID_SELECTED_TAB"))
+        return
+    end
+    snapshotResource()
+    local data = buildSpellData()
     local spell, errorMessage
     if state.spellID then
         spell, errorMessage = getStorage().UpdateSpell(state.spellID, data)
@@ -1274,7 +1278,29 @@ local function createDialog()
     )
     local iconButton = addon.UIFactory.CreateIconButton(frame)
     iconButton:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", 0, -theme.Spacing.xs)
+    local previewActive = false
+    local function refreshIconPreview()
+        if not previewActive or state.loading or not frame:IsShown() then return end
+        local spell = buildSpellData()
+        if trim(spell.name) == "" then spell.name = nil end
+        addon.SpellTooltip.Show(iconButton, spell, false, "ANCHOR_RIGHT", {
+            showActionHints = false,
+        })
+    end
+    local function hideIconPreview()
+        if not previewActive then return end
+        previewActive = false
+        if GameTooltip:IsOwned(iconButton) then addon.SpellTooltip.Hide() end
+    end
+    iconButton:SetScript("OnEnter", function()
+        previewActive = true
+        refreshIconPreview()
+    end)
+    iconButton:SetScript("OnLeave", hideIconPreview)
+    iconButton:HookScript("OnHide", hideIconPreview)
+    frame:HookScript("OnHide", hideIconPreview)
     iconButton:SetScript("OnClick", function(_, button)
+        hideIconPreview()
         if button == "RightButton" then
             setSelectedIcon(nil)
             return
@@ -1762,6 +1788,13 @@ local function createDialog()
         field:HookScript("OnTextChanged", function()
             if dialog and not state.loading then updateEffectVisibility() end
         end)
+    end
+    for _, field in pairs(frame.fields) do
+        field:HookScript("OnTextChanged", refreshIconPreview)
+    end
+    resourceControl.amount:HookScript("OnTextChanged", refreshIconPreview)
+    for _, button in ipairs({ magicButton, abilityButton, buffToggle, healingToggle }) do
+        button:HookScript("OnClick", refreshIconPreview)
     end
     return frame
 end

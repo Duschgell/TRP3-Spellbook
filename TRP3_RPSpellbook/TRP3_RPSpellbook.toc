@@ -22,6 +22,7 @@ Bindings.lua
 Logger.lua
 Core\Runtime.lua
 Core\Cache.lua
+Data\ReleaseNotes.lua
 Core\Onboarding.lua
 Core\TutorialExamples.lua
 Core\TutorialEncounter.lua
@@ -73,6 +74,7 @@ GameMaster\TestMode.lua
 GameMaster\DelayedSubmission.lua
 GameMaster\Preparation.lua
 Chat\Links.lua
+Integrations\ChatAddonSupport.lua
 Chat\Insert.lua
 Chat\Fallbacks.lua
 Core\WhisperTemplates.lua
@@ -88,6 +90,7 @@ Communication\Hover.lua
 UI\PlayerTooltip.lua
 UI\Theme.lua
 UI\UIFactory.lua
+UI\VersionCheck.lua
 UI\GameMasterWidgets.lua
 UI\GameMasterActionList.lua
 UI\GameMasterNPCTooltip.lua
@@ -100,6 +103,7 @@ UI\TabEditor.lua
 UI\BookLayout.lua
 UI\EffectIcons.lua
 UI\EffectSurfaces.lua
+UI\EffectBar.lua
 UI\CurrentlyEffectsEditor.lua
 UI\BookMagicEffects.lua
 UI\BookMagic.lua

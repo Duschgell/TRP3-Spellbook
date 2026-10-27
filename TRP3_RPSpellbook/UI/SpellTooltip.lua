@@ -47,7 +47,8 @@ function addon.SpellTooltip.Show(owner, spell, canEdit, anchor, options)
     end
     local red, green, blue = addon.UIFactory.GetColorRGB(spell.nameColor)
     GameTooltip:SetOwner(owner, anchor or "ANCHOR_RIGHT")
-    GameTooltip:SetText(text(spell.name or addon.L("UNKNOWN_ABILITY")), red, green, blue)
+    GameTooltip:SetText(addon.TRP3Bridge.GetTooltipIconMarkup(spell.icon)
+        .. text(spell.name or addon.L("UNKNOWN_ABILITY")), red, green, blue)
 
     local magicSummary = getMagicSummary(spell)
     if magicSummary then
@@ -79,13 +80,15 @@ function addon.SpellTooltip.Show(owner, spell, canEdit, anchor, options)
         GameTooltip:Show()
         return true
     end
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(addon.L("LEFT_CLICK_DETAILS"), 0.76, 0.69, 0.56)
-    if options.showChatHint ~= false then
-        GameTooltip:AddLine(addon.L("SHIFT_CLICK_CHAT"), 0.76, 0.69, 0.56)
-    end
-    if canEdit then
-        GameTooltip:AddLine(addon.L("RIGHT_CLICK_EDIT"), 0.76, 0.69, 0.56)
+    if options.showActionHints ~= false then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(addon.L("LEFT_CLICK_DETAILS"), 0.76, 0.69, 0.56)
+        if options.showChatHint ~= false then
+            GameTooltip:AddLine(addon.L("SHIFT_CLICK_CHAT"), 0.76, 0.69, 0.56)
+        end
+        if canEdit then
+            GameTooltip:AddLine(addon.L("RIGHT_CLICK_EDIT"), 0.76, 0.69, 0.56)
+        end
     end
     GameTooltip:Show()
     return true
