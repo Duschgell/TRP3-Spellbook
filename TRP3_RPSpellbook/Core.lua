@@ -183,6 +183,7 @@ local function initializeCore()
         addon.Logger.Error(layoutError)
     end
 
+    if addon.VersionCheck then addon.VersionCheck.Initialize() end
     local communicationCallSuccess, communicationSuccess, communicationError =
         addon.Runtime.SafeInvoke(addon.Communication.Initialize)
     if not communicationCallSuccess then

@@ -81,6 +81,8 @@ function addon.SpellCreationSettings.Initialize()
         configuration,
         "rpspellbook_effect_bar_locked",
         false
+        "rpspellbook_update_notifications",
+        true
     ) then
         return false, addon.L("TRP3_API_UNAVAILABLE", "registerConfigKey")
     end
@@ -93,6 +95,7 @@ function addon.SpellCreationSettings.Initialize()
             "rpspellbook_currently_effects",
             REDUCED_MOTION_KEY,
             "rpspellbook_effect_bar_locked",
+            "rpspellbook_update_notifications",
         }, notifyListeners)
     end
     registerKey(configuration, "rpspellbook_aura_nameplates", false)
@@ -187,6 +190,15 @@ function addon.SpellCreationSettings.ShouldPublishCurrentlyEffects()
     return false
 end
 
+function addon.SpellCreationSettings.ShouldNotifyUpdates()
+    local configuration = getConfiguration()
+    if configuration and type(configuration.getValue) == "function" then
+        local ok, value = pcall(configuration.getValue, "rpspellbook_update_notifications")
+        if ok and type(value) == "boolean" then return value end
+    end
+    return true
+end
+
 function addon.SpellCreationSettings.GetPageElements()
     local constants = addon.Constants
     local elements = {
@@ -197,6 +209,12 @@ function addon.SpellCreationSettings.GetPageElements()
         {
             inherit = "TRP3_ConfigParagraph",
             title = addon.L("SPELL_CREATION_SETTINGS_DESCRIPTION"),
+        },
+        {
+            inherit = "TRP3_ConfigCheck",
+            title = addon.L("UPDATE_SETTING"),
+            help = addon.L("UPDATE_SETTING_HELP"),
+            configKey = "rpspellbook_update_notifications",
         },
         {
             inherit = "TRP3_ConfigDropDown",
