@@ -6,7 +6,7 @@ local function invalid(t, validators, input)
 end
 
 return {
-    format = 1, area = "validators", count = 3,
+    format = 1, area = "validators", count = 6,
 
     { id = "validators.normalizes-without-mutation", run = function(t, api, F)
 
@@ -107,5 +107,48 @@ return {
 
             invalid(t, validators, F.spell({ effects = effects }))
         end
+    end },
+
+    { id = "validators.translates-known-preset-fields", run = function(t, api, F)
+        t.eq(api.localization.SetLanguage("deDE"), true)
+        local input = F.spell({ name = "Arcane", description = "Arcane magic",
+            resource = "3 red essences", range = "Melee", castTime = "1-2 rounds", cooldown = "None",
+            tags = { magicType = "arcane", magicSchool = "Evocation", damageType = "Physical" },
+            effects = { debuff = true, debuffType = "Curse", durationRounds = 3 } })
+        local before = F.copy(input)
+        local valid, cleaned = api.validators.ValidateSpell(input)
+        t.eq(valid, true)
+        t.eq(cleaned.tags.magicType, "Arkan")
+        t.eq(cleaned.tags.magicSchool, api.localization.Get("PRESET_SCHOOL_EVOCATION"))
+        t.eq(cleaned.tags.damageType, api.localization.Get("PRESET_DAMAGE_PHYSICAL"))
+        t.eq(cleaned.effects.debuffType, api.localization.Get("PRESET_DEBUFF_CURSE"))
+        t.eq(cleaned.resource, "3 " .. api.localization.Get("PRESET_RESOURCE_ESSENCE_RED_PLURAL"))
+        t.eq(cleaned.range, api.localization.Get("PRESET_RANGE_MELEE"))
+        t.eq(cleaned.castTime, api.localization.Get("PRESET_TIME_RANGE_ROUNDS", "1", "2"))
+        t.eq(cleaned.cooldown, api.localization.Get("PRESET_COOLDOWN_NONE"))
+        t.eq(cleaned.name, "Arcane")
+        t.eq(cleaned.description, "Arcane magic")
+        t.same(input, before)
+    end },
+
+    { id = "validators.preserves-custom-preset-text", run = function(t, api, F)
+        t.eq(api.localization.SetLanguage("deDE"), true)
+        for _, text in ipairs({ "Arkane Magie", "Arcane magic", "Arcane Fire", "Superarcane", "Arkan!" }) do
+            local valid, cleaned = api.validators.ValidateSpell(F.spell({ tags = { magicType = text } }))
+            t.eq(valid, true)
+            t.eq(cleaned.tags.magicType, text)
+        end
+    end },
+
+    { id = "validators.isolates-locale-per-case", run = function(t, api, F)
+        t.eq(api.localization.GetLocale(), "enUS")
+        t.eq(api.localization.SetLanguage("frFR"), true)
+        local valid, cleaned = api.validators.ValidateSpell(F.spell({ resource = "ENERGY",
+            tags = { magicType = "ARKAN" } }))
+        t.eq(valid, true)
+        t.eq(cleaned.resource, api.localization.Get("PRESET_RESOURCE_ENERGY"))
+        t.eq(cleaned.tags.magicType, api.localization.Get("PRESET_MAGIC_ARCANE"))
+        t.eq(api.localization.SetLanguage("unsupported"), false)
+        t.eq(api.localization.GetLocale(), "frFR")
     end },
 }
