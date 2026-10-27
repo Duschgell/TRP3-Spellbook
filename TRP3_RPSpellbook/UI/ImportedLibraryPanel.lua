@@ -508,6 +508,7 @@ function addon.ImportedLibraryPanel.Create(parent)
     bookSection:SetScript("OnSizeChanged", requestLayout)
     panel.requestLayout = requestLayout
     layoutPanel(panel)
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(panel, "import") end
     return panel
 end
 

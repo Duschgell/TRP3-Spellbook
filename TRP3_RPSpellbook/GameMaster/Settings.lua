@@ -595,6 +595,7 @@ function addon.GameMasterSettings.RegisterPage()
     end
     addon.GameMasterSettings.pageRegistered = true
     initializeBookIcon(page.frame)
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(page.frame, "settings") end
     if addon.BookNavigationStyle then addon.BookNavigationStyle.Initialize(page.frame) end
     return true
 end

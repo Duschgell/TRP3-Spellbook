@@ -87,6 +87,7 @@ local function createWindow()
     frame.previousButton = previousButton
     previousButton:SetScript("OnClick", function() state.page = state.page - 1 render() end)
     nextButton:SetScript("OnClick", function() state.page = state.page + 1 render() end)
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(frame, "import") end
     return frame
 end
 

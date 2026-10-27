@@ -31,8 +31,29 @@ local function canArrange(panel)
     return panel.editMode == true
 end
 
+local function playPageTurnSound()
+    local sound = type(TRP3_InterfaceSounds) == "table" and TRP3_InterfaceSounds.PageChange
+    if type(sound) ~= "number" then
+        sound = type(SOUNDKIT) == "table" and SOUNDKIT.IG_ABILITY_PAGE_TURN
+    end
+    if type(sound) == "number" and type(PlaySound) == "function" then
+        pcall(PlaySound, sound, "SFX")
+    end
+end
+
 local function animate(panel, frame, kind, callback, direction)
     if panel.bookClosing and kind ~= "close" then return end
+    if kind == "page" and type(callback) == "function" then
+        local commit = callback
+        callback = function()
+            local page, tab, favorites = panel.currentPage, panel.activeTabID, panel.favoritesOnly
+            commit()
+            if panel:IsVisible() and (panel.currentPage ~= page
+                or panel.activeTabID ~= tab or panel.favoritesOnly ~= favorites) then
+                playPageTurnSound()
+            end
+        end
+    end
     if panel.fancyPresentation and addon.BookScene
         and (kind == "page" or kind == "open" or kind == "close") then
         return addon.BookScene.Play(panel, kind, callback, direction)
@@ -2046,6 +2067,7 @@ function addon.SpellbookPanel.Create(parent, options)
         end
         animate(panel, panel, "open")
     end)
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(panel, "book") end
     content:SetScript("OnSizeChanged", requestLayout)
     refreshLayout()
     requestLayout()

@@ -1684,5 +1684,9 @@ addon.Localization.Register("frFR", {
     WINDOW_MINIMIZE = "Réduire la fenêtre",
     WINDOW_RESTORE = "Restaurer la fenêtre",
 
+    SEASONAL_THEMES = "Thèmes saisonniers",
+    SEASONAL_SOUNDS = "Sons saisonniers",
+    SEASONAL_MUSIC = "Musique saisonnière",
+
     YES = "Oui",
 })
