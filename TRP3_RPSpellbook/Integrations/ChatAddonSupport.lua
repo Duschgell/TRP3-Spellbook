@@ -65,7 +65,7 @@ local function reportFailure()
     addon.Logger.Error(addon.L("CHAT_LINK_API_UNAVAILABLE"))
 end
 
-function integration.Initialize()
+local function initializeUCM()
     local codec, stub, throttle = _G.C_EncodingUtil, _G.LibStub, _G.ChatThrottleLib
     if type(codec) ~= "table" or type(codec.EncodeBase64) ~= "function" or type(codec.DecodeBase64) ~= "function"
         or (type(stub) ~= "table" and type(stub) ~= "function")
@@ -102,12 +102,51 @@ function integration.Initialize()
     return true
 end
 
+-- Prat 3.0 Support
+local registeredPrat
+
+local function initializePrat()
+    local prat = _G.Prat
+    if type(prat) ~= "table" or type(prat.RegisterPattern) ~= "function"
+        or type(prat.RegisterMatch) ~= "function" then return false end
+    if registeredPrat == prat then return true end
+
+    local function protectLink(link, identifier)
+        if readable(link) and readable(identifier) and addon.ChatLinks.DecodeNativeDisplayName(identifier) then
+            return prat:RegisterMatch(link)
+        end
+    end
+
+    prat:RegisterPattern({
+        pattern = "(|c%x%x%x%x%x%x%x%x|Haddon:totalrp3:[^:|]+:([^|]+)|h[^|]*|h|r)",
+        matchfunc = protectLink,
+        type = "FRAME",
+        priority = 42,
+    }, "TRP3_RPSpellbook")
+    prat:RegisterPattern({
+        pattern = "(|Haddon:totalrp3:[^:|]+:([^|]+)|h[^|]*|h)",
+        matchfunc = protectLink,
+        type = "FRAME",
+        priority = 43,
+    }, "TRP3_RPSpellbook")
+    registeredPrat = prat
+    return true
+end
+
+function integration.Initialize()
+    local pratReady = initializePrat()
+    local ucmReady = initializeUCM()
+    return pratReady or ucmReady
+end
+
 if type(CreateFrame) == "function" then
     local frame = CreateFrame("Frame")
     frame:RegisterEvent("ADDON_LOADED")
     frame:RegisterEvent("PLAYER_LOGIN")
     frame:SetScript("OnEvent", function(self, event, name)
         if event == "PLAYER_LOGIN" then self:UnregisterEvent("PLAYER_LOGIN") end
-        if hookedCore or event == "PLAYER_LOGIN" or name == "UnlimitedChatMessage" then integration.Initialize() end
+        if hookedCore or event == "PLAYER_LOGIN" or name == "UnlimitedChatMessage" or name == "Prat-3.0" then
+            integration.Initialize()
+        end
     end)
 end
