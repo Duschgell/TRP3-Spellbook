@@ -1297,7 +1297,7 @@ addon.Localization.Register("frFR", {
     TUTORIAL_EFFECTS_TEXT = "Le bouton passe d'aucun effet à Amélioration, puis à Affaiblissement. Une amélioration renforce généralement la cible ; un affaiblissement l'affaiblit ou lui fait du mal. Vous pouvez les appliquer à vous-même ou aux membres de votre groupe ou raid à tout moment. Ils s'affichent alors sur les personnages concernés.",
     TUTORIAL_EFFECTS_TITLE = "Améliorations et affaiblissements",
 
-    TUTORIAL_EFFECT_MESSAGE_TEXT = "Ce champ est facultatif. Écrivez ici le message envoyé à un autre personnage joueur lorsque votre amélioration ou affaiblissement lui est appliqué en combat. De quoi s'y retrouver dans la mêlée !",
+    TUTORIAL_EFFECT_MESSAGE_TEXT = "Ce champ est facultatif. Écrivez ici le message qui sera chuchoté à un autre personnage joueur lorsque votre amélioration ou affaiblissement lui est appliqué. De quoi s'y retrouver dans la mêlée, ou renforcer l'immersion !",
     TUTORIAL_EFFECT_MESSAGE_TITLE = "Un message pour votre victime... euh, votre cible !",
 
     TUTORIAL_ENABLE_DURATION = "Choisissez Amélioration ou Affaiblissement pour afficher les champs supplémentaires.",

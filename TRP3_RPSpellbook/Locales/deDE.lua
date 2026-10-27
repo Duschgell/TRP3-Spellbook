@@ -1297,7 +1297,7 @@ addon.Localization.Register("deDE", {
     TUTORIAL_EFFECTS_TEXT = "Mit dem Knopf wechselst du durch zwischen kein Buff/Debuff, Buff und Debuff. Buffs stärken in der Regel ein Ziel, Debuffs schwächen oder schaden es. Buffs und Debuffs lassen sich jederzeit auf dich selbst oder Gruppe/Schlachtzugsmitglieder wirken und werden auch entsprechend dargestellt.",
     TUTORIAL_EFFECTS_TITLE = "Buffs und Debuffs",
 
-    TUTORIAL_EFFECT_MESSAGE_TEXT = "Dies ist optional. Wenn dein Buff/Debuff in einem Kampf auf einen anderen Spielercharakter erfolgreich gewirkt wird, kannst du hier eine Nachricht eingeben, womit er informiert wird. Dies kann für bessere Übersicht im Kampfchaos sorgen.",
+    TUTORIAL_EFFECT_MESSAGE_TEXT = "Dies ist optional. Wenn dein Buff/Debuff auf einen anderen Spielercharakter erfolgreich gewirkt wird, kannst du hier eine Nachricht eingeben. Diese Nachricht wird ihm dann zugeflüstert. Dies kann für bessere Übersicht im Kampfchaos sorgen, oder zur Immersion beitragen!",
     TUTORIAL_EFFECT_MESSAGE_TITLE = "Eine Nachricht für dein Opfer... ich meine Ziel!",
 
     TUTORIAL_ENABLE_DURATION = "Wähle Buff oder Debuff, dadurch erscheinen zusätzliche Eingabefelder.",

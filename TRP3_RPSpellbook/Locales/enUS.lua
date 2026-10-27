@@ -1297,7 +1297,7 @@ addon.Localization.Register("enUS", {
     TUTORIAL_EFFECTS_TEXT = "The button cycles through no buff/debuff, Buff and Debuff. Buffs usually strengthen a target; debuffs weaken or harm it. You can apply buffs and debuffs to yourself or party and raid members at any time, and they'll be displayed accordingly.",
     TUTORIAL_EFFECTS_TITLE = "Buffs and debuffs",
 
-    TUTORIAL_EFFECT_MESSAGE_TEXT = "This is optional. If your buff or debuff successfully affects another player character in an encounter, you can enter a message here to let them know. It can help everyone keep track in the chaos of battle.",
+    TUTORIAL_EFFECT_MESSAGE_TEXT = "This is optional. Enter a message here to whisper to another player character when your buff or debuff is successfully applied to them. It can help them keep track in the chaos of battle, or add to the immersion!",
     TUTORIAL_EFFECT_MESSAGE_TITLE = "A message for your victim... I mean target!",
 
     TUTORIAL_ENABLE_DURATION = "Choose Buff or Debuff to show more fields.",
