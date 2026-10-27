@@ -891,6 +891,9 @@ local function buildSpellChatTooltip(api, snapshot)
     if type(spell) ~= "table" then
         spell = { name = addon.L("UNKNOWN_ABILITY") }
     end
+    if addon.ChatLinks.ValidateTooltipSpell then
+        spell = addon.ChatLinks.ValidateTooltipSpell(spell) or spell
+    end
 
     local tooltipLines = api.ChatLinkTooltipLines()
     local name = addon.ChatLinks.SanitizeDisplayName(spell.name)

@@ -27,11 +27,20 @@ local function array(value)
 end
 validation.Array = array
 
-local function retained(original, normalized)
-    if type(original) ~= "table" then return original == normalized end
+local function retained(original, normalized, field)
+    if type(original) ~= "table" then
+        if original == normalized then return true end
+        local presets = addon.SpellCreationPresets
+        if type(original) == "string" and type(normalized) == "string"
+            and presets and presets.NormalizeField then
+            field = field == "Magieart" and "magicType" or field == "Magieschule" and "magicSchool" or field
+            return presets.NormalizeField(field, original) == normalized
+        end
+        return false
+    end
     if type(normalized) ~= "table" then return false end
     for key, value in pairs(original) do
-        if not retained(value, normalized[key]) then return false end
+        if not retained(value, normalized[key], key) then return false end
     end
     return true
 end

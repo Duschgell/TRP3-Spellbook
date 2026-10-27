@@ -277,6 +277,29 @@ function addon.SpellCreationSettings.GetPageElements()
             configKey = "rpspellbook_currently_effects",
         },
     }
+    local api = _G.TRP3_API
+    if addon.Localization and type(addon.Localization.GetLanguage) == "function" and api and api.loc then
+        local languages = {
+            { _G.DEFAULT or addon.L("SPELL_CREATION_EDITOR_THEME_DEFAULT"), "client" },
+            { "English", "enUS" }, { "Deutsch", "deDE" }, { "Français", "frFR" },
+        }
+        table.insert(elements, 3, {
+            inherit = "TRP3_ConfigDropDown",
+            title = api.loc.CO_GENERAL_LOCALE,
+            listContent = languages,
+            listDefault = addon.Localization.GetLanguage(),
+            listCancel = true,
+            listCallback = function(language)
+                if language == addon.Localization.GetLanguage() then return end
+                local label
+                for _, entry in ipairs(languages) do if entry[2] == language then label = entry[1]; break end end
+                if not label or not api.popup or type(api.popup.showConfirmPopup) ~= "function" then return end
+                api.popup.showConfirmPopup(api.loc.CO_GENERAL_CHANGELOCALE_ALERT:format(label), function()
+                    if addon.Localization.SetLanguage(language) then ReloadUI() end
+                end)
+            end,
+        })
+    end
     local effectElements = addon.EffectBar and addon.EffectBar.GetSettingsElements() or {}
     for _, element in ipairs(effectElements) do elements[#elements + 1] = element end
     return elements

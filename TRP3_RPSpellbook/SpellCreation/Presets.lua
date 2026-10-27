@@ -148,18 +148,27 @@ local debuffTypes = {
     option("bleed", "PRESET_DEBUFF_BLEED"),
 }
 
-local function localize(options)
+local function localeText(locale, key, ...)
+    if not locale then return addon.L(key, ...) end
+    local translations = addon.Localization.translations
+    local text = (translations[locale] or {})[key]
+        or (translations.enUS or {})[key]
+    if not text then return nil end
+    return select("#", ...) > 0 and string.format(text, ...) or text
+end
+
+local function localize(options, locale)
     local localized = {}
     for index, item in ipairs(options or {}) do
         localized[index] = {
             allowsAmount = item.allowsAmount,
-            children = item.children and localize(item.children) or nil,
+            children = item.children and localize(item.children, locale) or nil,
             color = item.color,
-            plural = item.pluralKey and addon.L(item.pluralKey) or nil,
+            plural = item.pluralKey and localeText(locale, item.pluralKey) or nil,
             exclusive = item.exclusive,
-            label = addon.L(item.labelKey),
+            label = localeText(locale, item.labelKey),
             order = item.order,
-            rangeValue = item.rangeValueKey and addon.L(item.rangeValueKey) or nil,
+            rangeValue = item.rangeValueKey and localeText(locale, item.rangeValueKey) or nil,
             value = item.value,
         }
     end
@@ -231,7 +240,7 @@ function addon.SpellCreationPresets.GetDebuffTypes()
     return localize(debuffTypes)
 end
 
-function addon.SpellCreationPresets.FormatTimeSelection(options, selected, timeMode, valueKind)
+function addon.SpellCreationPresets.FormatTimeSelection(options, selected, timeMode, valueKind, locale)
     local chosen = {}
     for _, item in ipairs(options or {}) do
         if selected and selected[item.value] then
@@ -248,24 +257,153 @@ function addon.SpellCreationPresets.FormatTimeSelection(options, selected, timeM
         return chosen[1].label
     end
     if timeMode == "time" and valueKind == "cooldown" then
-        return addon.L(
+        return localeText(locale,
             "PRESET_TIME_RANGE_GENERIC",
             chosen[1].label,
             chosen[2].label
         )
     end
     if timeMode == "time" then
-        return addon.L(
+        return localeText(locale,
             "PRESET_TIME_RANGE_SECONDS",
             chosen[1].rangeValue or chosen[1].label,
             chosen[2].rangeValue or chosen[2].label
         )
     end
-    return addon.L(
+    return localeText(locale,
         "PRESET_TIME_RANGE_ROUNDS",
         chosen[1].rangeValue or chosen[1].label,
         chosen[2].rangeValue or chosen[2].label
     )
+end
+
+local translationCaches = {}
+local translationLocales = { "enUS", "deDE", "frFR" }
+
+local function foldPresetText(text)
+    return text:lower():gsub("\195([\128-\158])", function(byte)
+        local value = byte:byte()
+        return "\195" .. string.char(value == 151 and value or value + 32)
+    end):gsub("\197\146", "\197\147"):gsub("\225\186\158", "\195\159")
+end
+
+local function buildTranslations(locale, translations)
+    local fields = {}
+    local function add(field, source, target, item)
+        if not source or not target then return end
+        fields[field] = fields[field] or {}
+        local key = foldPresetText(source)
+        local previous = fields[field][key]
+        if previous == false then return end
+        if previous and previous.text ~= target then
+            fields[field][key] = false
+        else
+            fields[field][key] = {
+                text = target,
+                allowsAmount = item and item.allowsAmount,
+                singular = item and localeText(locale, item.labelKey),
+                plural = item and item.pluralKey and localeText(locale, item.pluralKey),
+            }
+        end
+    end
+    local function addOptions(field, options)
+        for _, item in ipairs(options) do
+            if item.children then
+                addOptions(field, item.children)
+            else
+                for _, sourceLocale in ipairs(translationLocales) do
+                    if translations[sourceLocale] then
+                        add(field, localeText(sourceLocale, item.labelKey), localeText(locale, item.labelKey), item)
+                        if item.pluralKey then
+                            add(field, localeText(sourceLocale, item.pluralKey), localeText(locale, item.pluralKey), item)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    addOptions("resource", resources.magic)
+    addOptions("resource", resources.ability)
+    addOptions("range", ranges)
+    addOptions("magicType", magicTypes)
+    addOptions("magicType", magicSubtypes)
+    addOptions("magicSchool", magicSchools)
+    addOptions("damageType", damageTypes)
+    addOptions("debuffType", debuffTypes)
+
+    for field, modes in pairs({ castTime = castTimes, cooldown = cooldowns }) do
+        addOptions(field, modes.rounds)
+        addOptions(field, modes.time)
+        for mode, options in pairs(modes) do
+            for firstIndex, first in ipairs(options) do
+                if not first.exclusive then
+                    for secondIndex = firstIndex + 1, #options do
+                        local second = options[secondIndex]
+                        if not second.exclusive then
+                            local selected = { [first.value] = true, [second.value] = true }
+                            local target = addon.SpellCreationPresets.FormatTimeSelection(
+                                localize(options, locale), selected, mode, field, locale)
+                            for _, sourceLocale in ipairs(translationLocales) do
+                                if translations[sourceLocale] then
+                                    local source = addon.SpellCreationPresets.FormatTimeSelection(
+                                        localize(options, sourceLocale), selected, mode, field, sourceLocale)
+                                    add(field, source, target)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return fields
+end
+
+function addon.SpellCreationPresets.NormalizeField(field, text, locale)
+    local localization = addon.Localization
+    if type(text) ~= "string" or #text > 80 or type(localization) ~= "table"
+        or type(localization.translations) ~= "table" then return text end
+    local translations = localization.translations
+    locale = locale or localization.GetLocale()
+    if not translations[locale] then locale = "enUS" end
+    local cache = translationCaches[locale]
+    if not cache or cache.enUS ~= translations.enUS
+        or cache.deDE ~= translations.deDE or cache.frFR ~= translations.frFR then
+        cache = { enUS = translations.enUS, deDE = translations.deDE,
+            frFR = translations.frFR, fields = buildTranslations(locale, translations) }
+        translationCaches[locale] = cache
+    end
+    local options = cache.fields[field]
+    if not options then return text end
+    local item = options[foldPresetText(text)]
+    if item then return item.text end
+    if field == "resource" then
+        local amount, name = text:match("^(%d+) (.+)$")
+        item = name and options[foldPresetText(name)]
+        if item and item.allowsAmount and #amount <= 5 then
+            return amount .. " " .. (tonumber(amount) ~= 1 and item.plural or item.singular)
+        end
+    end
+    return text
+end
+
+function addon.SpellCreationPresets.NormalizeSpell(spell)
+    if type(spell) ~= "table" then return end
+    local normalize = addon.SpellCreationPresets.NormalizeField
+    for _, field in ipairs({ "resource", "range", "castTime", "cooldown" }) do
+        spell[field] = normalize(field, spell[field])
+    end
+    if type(spell.tags) == "table" then
+        for key, field in pairs({ [addon.Constants.MAGIC_TAG_TYPE] = "magicType",
+            [addon.Constants.MAGIC_TAG_SCHOOL] = "magicSchool",
+            [addon.Constants.SPELL_TAG_DAMAGE_TYPE] = "damageType",
+            Magieart = "magicType", Magieschule = "magicSchool" }) do
+            spell.tags[key] = normalize(field, spell.tags[key])
+        end
+    end
+    if type(spell.effects) == "table" then
+        spell.effects.debuffType = normalize("debuffType", spell.effects.debuffType)
+    end
 end
 
 function addon.SpellCreationPresets.MatchTimeSelection(

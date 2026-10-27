@@ -361,6 +361,10 @@ function backup.ApplyStartup()
             local live = _G.TRP3_RPSpellbookNPCDB
             for key in pairs(live) do live[key] = nil end
             for key, item in pairs(restoredNPC) do live[key] = item end
+            local presets = addon.SpellCreationPresets
+            if presets and presets.NormalizeSpell and type(live.book) == "table" then
+                for _, spell in pairs(live.book.spells or {}) do presets.NormalizeSpell(spell) end
+            end
         end)
     end
     applying, applied = false, true

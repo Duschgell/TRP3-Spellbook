@@ -56,13 +56,19 @@ local function getBuffType(spell)
     return trimmed(tags[constants.MAGIC_TAG_SCHOOL] or tags.Magieschule)
 end
 
+local function effectColorKey(field, label)
+    local presets = addon.SpellCreationPresets
+    if presets and presets.NormalizeField then label = presets.NormalizeField(field, label, "enUS") end
+    return normalized(label)
+end
+
 function addon.SpellPresentation.GetEffectPresentation(spell)
     local effects = type(spell) == "table" and spell.effects or nil
     if type(effects) ~= "table" then return nil end
     local duration = effects.durationRounds == 0 and constants.EFFECT_DURATION_INFINITY or effects.duration
     if effects.debuff == true then
         local label = trimmed(effects.debuffType) or "Debuff"
-        local color = debuffColors[normalized(label)]
+        local color = debuffColors[effectColorKey("debuffType", label)]
         return {
             kind = "debuff", label = label,
             colors = color and { color } or {},
@@ -73,7 +79,7 @@ function addon.SpellPresentation.GetEffectPresentation(spell)
         local label = getBuffType(spell) or addon.L("EFFECT_BUFF")
         return {
             kind = "buff", label = label,
-            colors = buffColors[normalized(label)] or {},
+            colors = buffColors[effectColorKey("magicType", label)] or {},
             thickness = 1, duration = duration,
         }
     end
