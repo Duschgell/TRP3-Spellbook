@@ -1,8 +1,16 @@
 local root = ...
 local F = {}
+F.releaseCheck = assert(loadfile(root .. "/.tools/ci/check_release_notes.lua"))().Validate
 
 local modules = {
     constants = { "Constants.lua", "Constants" },
+    extensions = { "Core/ConstantsExtension.lua", "Constants" },
+    localization = { "Localization.lua", "Localization", "GetLocale", "Get" },
+    english = { "Locales/enUS.lua", "Localization" },
+    german = { "Locales/deDE.lua", "Localization" },
+    french = { "Locales/frFR.lua", "Localization" },
+    presets = { "SpellCreation/Presets.lua", "SpellCreationPresets", "GetResources", "GetMagicTypes" },
+    notes = { "Data/ReleaseNotes.lua", "ReleaseNotes", "Get", "GetVersions", "GetCurrent", "Copy" },
     portable = { "Data/PortableTable.lua", "PortableTable", "Encode", "Decode" },
     validators = {
         "Data/Validators.lua", "Validators", "ValidateSpell", "ValidateTab",
@@ -12,9 +20,10 @@ local modules = {
     },
 }
 local plans = {
+    releaseNotes = { "constants", "extensions", "notes" },
     portable = { "portable" },
-    validators = { "constants", "validators" },
-    backup = { "constants", "portable", "validators", "backup" },
+    validators = { "constants", "localization", "english", "german", "french", "presets", "validators" },
+    backup = { "constants", "portable", "localization", "english", "german", "french", "presets", "validators", "backup" },
 }
 
 local function environment()
@@ -22,7 +31,7 @@ local function environment()
 
     for _, name in ipairs({
         "assert", "error", "ipairs", "pairs", "next", "pcall",
-        "tonumber", "tostring", "type", "getmetatable", "setmetatable",
+        "tonumber", "tostring", "type", "getmetatable", "setmetatable", "select",
     })
     do 
     env[name] = _G[name] 
@@ -83,6 +92,15 @@ function F.fresh(area)
     })
 
     local env, api = environment(), {}
+    if area == "validators" or area == "backup" then
+        local locale = "enUS"
+        rawset(env, "GetLocale", function() return locale end)
+        rawset(env, "TRP3_RPSpellbookDB", { settings = {} })
+        api.setLocale = function(value)
+            assert(value == "enUS" or value == "deDE" or value == "frFR", "Unsupported test locale")
+            locale = value
+        end
+    end
 
     for _, key in ipairs(plan) 
     do
@@ -105,6 +123,13 @@ function F.fresh(area)
         api[key] = export
     end
     return api
+end
+
+function F.translates(api)
+    local field, spell = api.presets.NormalizeField, api.presets.NormalizeSpell
+    assert((field == nil and spell == nil) or (type(field) == "function" and type(spell) == "function"),
+        "Incomplete preset translation API")
+    return type(spell) == "function"
 end
 
 

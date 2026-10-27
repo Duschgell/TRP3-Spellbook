@@ -30,9 +30,18 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build and verify ZIP
+      - name: Prepare release notes check
         shell: bash
-        run: python3 -I -B .tools/ci/build_release.py . "$RUNNER_TEMP/TRP3_Spellbook.zip"
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y lua5.1
+
+      - name: Build and verify ZIP
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: python3 -I -B .tools/ci/build_release.py . "$RUNNER_TEMP/TRP3_Spellbook.zip" "$RELEASE_TAG"
 
       - name: Attach ZIP and license to release
         env:

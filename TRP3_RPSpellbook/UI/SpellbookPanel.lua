@@ -1789,6 +1789,19 @@ function addon.SpellbookPanel.Create(parent, options)
             renderPanel(panel)
         end, 1)
     end)
+    panel:EnableMouseWheel(true)
+    panel:SetScript("OnMouseWheel", function(_, delta)
+        if delta == 0 or panel.detailSpellID or panel.bookClosing
+            or panel.draggedSpellID or panel.draggedTabID
+            or (panel.bookBurn and panel.bookBurn.playing)
+            or (addon.BookScene and addon.BookScene.IsPlaying(panel)) then
+            return
+        end
+        local button = delta > 0 and previousPageButton or nextPageButton
+        if button:IsVisible() and button:IsEnabled() then
+            button:Click()
+        end
+    end)
     newSpellButton:SetScript("OnClick", function()
         addon.SpellEditorWindow.OpenNew(panel.activeTabID, function(tabID)
             refreshFromDatabase(panel, tabID)
