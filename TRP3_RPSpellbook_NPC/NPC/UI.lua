@@ -834,6 +834,7 @@ function archive.CreatePage(parent)
         for _, field in pairs(page.profile.fields) do field:ClearFocus() end
     end)
     page:SetScript("OnSizeChanged", refresh)
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(page, "npc") end
     return page
 end
 
