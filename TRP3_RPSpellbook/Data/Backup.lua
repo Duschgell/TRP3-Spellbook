@@ -102,6 +102,7 @@ local function validate(value)
         end
         if value.configuration.rpspellbook_effect_bar_locked == nil then
             value.configuration.rpspellbook_effect_bar_locked = false
+        end
         if value.configuration.rpspellbook_update_notifications == nil then
             value.configuration.rpspellbook_update_notifications = true
         end

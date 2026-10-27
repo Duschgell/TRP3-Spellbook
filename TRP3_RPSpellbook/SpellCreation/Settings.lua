@@ -81,6 +81,8 @@ function addon.SpellCreationSettings.Initialize()
         configuration,
         "rpspellbook_effect_bar_locked",
         false
+    ) or not registerKey(
+        configuration,
         "rpspellbook_update_notifications",
         true
     ) then
