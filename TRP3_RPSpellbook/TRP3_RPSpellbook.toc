@@ -22,6 +22,7 @@ Bindings.lua
 Logger.lua
 Core\Runtime.lua
 Core\Cache.lua
+Data\ReleaseNotes.lua
 Core\Onboarding.lua
 Core\TutorialExamples.lua
 Core\TutorialEncounter.lua
@@ -88,6 +89,7 @@ Communication\Hover.lua
 UI\PlayerTooltip.lua
 UI\Theme.lua
 UI\UIFactory.lua
+UI\VersionCheck.lua
 UI\GameMasterWidgets.lua
 UI\GameMasterActionList.lua
 UI\GameMasterNPCTooltip.lua

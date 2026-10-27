@@ -408,6 +408,7 @@ local function registerMessageFilters()
 end
 
 local function onSetItemRef(link, text, button)
+    if addon.VersionCheck and addon.VersionCheck.HandleLink(link, button) then return end
     if addon.TimedEffectsView and addon.TimedEffectsView.HandleOfferLink
         and addon.TimedEffectsView.HandleOfferLink(link, button) then return end
     if not addon.ChatLinks.IsSpellLink(link) or (button and button ~= "LeftButton") then

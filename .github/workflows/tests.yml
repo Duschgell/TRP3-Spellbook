@@ -58,6 +58,10 @@ jobs:
         shell: bash
         run: python3 -I -B .tools/ci/addon_check.py .
 
+      - name: Check release notes
+        shell: bash
+        run: lua5.1 .tools/ci/check_release_notes.lua .
+
   addon-tests:
     name: Addon tests
     runs-on: ubuntu-24.04

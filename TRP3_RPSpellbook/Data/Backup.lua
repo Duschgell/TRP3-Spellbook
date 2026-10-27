@@ -25,6 +25,7 @@ local specs = {
     TRP3_RPSpellbook_CreationEditorTheme = enum("default", "midnight", "parchment", "emerald", "titan", "dynamic"),
     TRP3_RPSpellbook_BookPresentation = enum("default", "fancy"),
     rpspellbook_fancy_reduced_motion = "boolean",
+    rpspellbook_update_notifications = "boolean",
     TRP3_RPSpellbook_CreationMagicSubtypes = "boolean",
     rpspellbook_currently_effects = "boolean", rpspellbook_aura_nameplates = "boolean",
     toolbar_content_trp3_rpspellbook = "boolean",
@@ -97,6 +98,9 @@ local function validate(value)
          
         if value.configuration.rpspellbook_fancy_reduced_motion == nil then
             value.configuration.rpspellbook_fancy_reduced_motion = false
+        end
+        if value.configuration.rpspellbook_update_notifications == nil then
+            value.configuration.rpspellbook_update_notifications = true
         end
         for key, item in pairs(value.configuration) do if not validPreference(key, item) then return false end end
         for _, key in ipairs(configKeys) do if value.configuration[key] == nil then return false end end

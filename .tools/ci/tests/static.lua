@@ -1,8 +1,11 @@
 local root = ...
 local F = {}
+F.releaseCheck = assert(loadfile(root .. "/.tools/ci/check_release_notes.lua"))().Validate
 
 local modules = {
     constants = { "Constants.lua", "Constants" },
+    extensions = { "Core/ConstantsExtension.lua", "Constants" },
+    notes = { "Data/ReleaseNotes.lua", "ReleaseNotes", "Get", "GetVersions", "GetCurrent", "Copy" },
     portable = { "Data/PortableTable.lua", "PortableTable", "Encode", "Decode" },
     validators = {
         "Data/Validators.lua", "Validators", "ValidateSpell", "ValidateTab",
@@ -12,6 +15,7 @@ local modules = {
     },
 }
 local plans = {
+    releaseNotes = { "constants", "extensions", "notes" },
     portable = { "portable" },
     validators = { "constants", "validators" },
     backup = { "constants", "portable", "validators", "backup" },
