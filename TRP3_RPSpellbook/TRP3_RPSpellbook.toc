@@ -74,6 +74,7 @@ GameMaster\TestMode.lua
 GameMaster\DelayedSubmission.lua
 GameMaster\Preparation.lua
 Chat\Links.lua
+Integrations\ChatAddonSupport.lua
 Chat\Insert.lua
 Chat\Fallbacks.lua
 Core\WhisperTemplates.lua

@@ -11,6 +11,65 @@ local function encodeComponent(value)
     end)
 end
 
+local NATIVE_SPACE = "\194\160"
+local NATIVE_PUBLIC_PREFIX, NATIVE_PRIVATE_PREFIX = "073111", "073112"
+local PRIVATE_DIGITS = "0123456789abcdefABCDEF-:"
+
+function addon.ChatLinks.GetNativeName(value)
+    local name = addon.ChatLinks.SanitizeDisplayName(value)
+        :gsub("%[", "("):gsub("%]", ")"):gsub("%s", NATIVE_SPACE)
+    local parts, length = {}, 0
+    for character in name:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        if length + #character > 80 then break end
+        parts[#parts + 1], length = character, length + #character
+    end
+    return table.concat(parts)
+end
+
+local function validNativeStem(stem)
+    return type(stem) == "string" and stem ~= "" and #stem <= 80
+        and not stem:find("[%s%c%[%]|]")
+end
+
+function addon.ChatLinks.CreateNativeIdentifier(identifier, isPrivate)
+    if type(identifier) ~= "string" or #identifier > 200 then return nil end
+    local stem, private = identifier:match("^(.-)%-rpsba%-(%d+%-%d+%-%x+:%d+)$")
+    if isPrivate then
+        if not private then return nil end
+        if not validNativeStem(stem) then return nil end
+        local digits = private:gsub(".", function(character)
+            return string.format("%02d", PRIVATE_DIGITS:find(character, 1, true) - 1)
+        end)
+        local result = stem .. ":" .. NATIVE_PRIVATE_PREFIX .. digits
+        return #result <= 200 and result or nil
+    end
+    local index
+    stem, index = identifier:match("^(.*):(%d+)$")
+    if not validNativeStem(stem) then return nil end
+    local result = stem .. ":" .. NATIVE_PUBLIC_PREFIX .. index
+    return #result <= 200 and result or nil
+end
+
+function addon.ChatLinks.DecodeNativeIdentifier(identifier)
+    if type(identifier) ~= "string" or #identifier > 200 then return nil end
+    local stem, digits = identifier:match("^(.*):(%d+)$")
+    if not validNativeStem(stem) then return nil end
+    local prefix, payload = digits:sub(1, #NATIVE_PUBLIC_PREFIX), digits:sub(#NATIVE_PUBLIC_PREFIX + 1)
+    if prefix == NATIVE_PUBLIC_PREFIX and payload:match("^%d+$") then
+        return stem .. ":" .. payload, false
+    end
+    if prefix ~= NATIVE_PRIVATE_PREFIX or #payload == 0 or #payload % 2 ~= 0 then return nil end
+    local parts = {}
+    for pair in payload:gmatch("%d%d") do
+        local index = tonumber(pair) + 1
+        if index > #PRIVATE_DIGITS then return nil end
+        parts[#parts + 1] = PRIVATE_DIGITS:sub(index, index)
+    end
+    local private = table.concat(parts)
+    if not private:match("^%d+%-%d+%-%x+:%d+$") then return nil end
+    return stem .. "-rpsba-" .. private, true
+end
+
 local function decodeComponent(value)
     local unescaped = value:gsub("%%%x%x", "")
     if unescaped:find("%", 1, true) then
@@ -37,10 +96,18 @@ end
 
 function addon.ChatLinks.DecodeNativeDisplayName(identifier)
     if type(identifier) ~= "string" or #identifier > addon.Constants.MAX_CHAT_TOKEN_LENGTH then return nil end
-    local stem = identifier:match("^(.-)%-rpsba%-%d+%-%d+%-%x+:%d+$")
-        or identifier:match("^(.-)%-rpsb:%d+$")
-    if not stem or stem == "" or not stem:match("^[%w%._%%%-]+$") then return nil end
-    local decoded = decodeComponent(stem)
+    local originalIdentifier, private = addon.ChatLinks.DecodeNativeIdentifier(identifier)
+    local decoded
+    if originalIdentifier then
+        local stem = private and originalIdentifier:match("^(.-)%-rpsba%-%d+%-%d+%-%x+:%d+$")
+            or originalIdentifier:match("^(.*):%d+$")
+        decoded = stem:gsub(NATIVE_SPACE, " ")
+    else
+        local stem = identifier:match("^(.-)%-rpsba%-%d+%-%d+%-%x+:%d+$")
+            or identifier:match("^(.-)%-rpsb:%d+$")
+        if not stem or stem == "" or not stem:match("^[%w%._%%%-]+$") then return nil end
+        decoded = decodeComponent(stem)
+    end
     if not decoded or decoded:find("[%c|]") then return nil end
      
     local position = 1
