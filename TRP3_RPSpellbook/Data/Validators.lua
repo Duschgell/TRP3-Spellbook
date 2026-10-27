@@ -304,6 +304,10 @@ function addon.Validators.ValidateSpell(data)
         tags = cleanTags(data.tags, errors),
     }
 
+    if addon.SpellCreationPresets and addon.SpellCreationPresets.NormalizeSpell then
+        addon.SpellCreationPresets.NormalizeSpell(cleaned)
+    end
+
     return #errors == 0, cleaned, errors
 end
 
