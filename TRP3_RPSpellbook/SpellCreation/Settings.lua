@@ -79,6 +79,10 @@ function addon.SpellCreationSettings.Initialize()
         false
     ) or not registerKey(
         configuration,
+        "rpspellbook_effect_bar_locked",
+        false
+    ) or not registerKey(
+        configuration,
         "rpspellbook_update_notifications",
         true
     ) then
@@ -92,11 +96,13 @@ function addon.SpellCreationSettings.Initialize()
             constants.SPELL_CREATION_SETTING_MAGIC_SUBTYPES,
             "rpspellbook_currently_effects",
             REDUCED_MOTION_KEY,
+            "rpspellbook_effect_bar_locked",
             "rpspellbook_update_notifications",
         }, notifyListeners)
     end
     registerKey(configuration, "rpspellbook_aura_nameplates", false)
     addon.SpellCreationSettings.initialized = true
+    notifyListeners()
     return true
 end
 
@@ -197,7 +203,7 @@ end
 
 function addon.SpellCreationSettings.GetPageElements()
     local constants = addon.Constants
-    return {
+    local elements = {
         {
             inherit = "TRP3_ConfigH1",
             title = addon.L("SPELL_CREATION_SETTINGS_HEADER"),
@@ -271,4 +277,7 @@ function addon.SpellCreationSettings.GetPageElements()
             configKey = "rpspellbook_currently_effects",
         },
     }
+    local effectElements = addon.EffectBar and addon.EffectBar.GetSettingsElements() or {}
+    for _, element in ipairs(effectElements) do elements[#elements + 1] = element end
+    return elements
 end

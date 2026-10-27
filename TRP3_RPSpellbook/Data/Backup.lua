@@ -25,6 +25,7 @@ local specs = {
     TRP3_RPSpellbook_CreationEditorTheme = enum("default", "midnight", "parchment", "emerald", "titan", "dynamic"),
     TRP3_RPSpellbook_BookPresentation = enum("default", "fancy"),
     rpspellbook_fancy_reduced_motion = "boolean",
+    rpspellbook_effect_bar_locked = "boolean",
     rpspellbook_update_notifications = "boolean",
     TRP3_RPSpellbook_CreationMagicSubtypes = "boolean",
     rpspellbook_currently_effects = "boolean", rpspellbook_aura_nameplates = "boolean",
@@ -98,6 +99,9 @@ local function validate(value)
          
         if value.configuration.rpspellbook_fancy_reduced_motion == nil then
             value.configuration.rpspellbook_fancy_reduced_motion = false
+        end
+        if value.configuration.rpspellbook_effect_bar_locked == nil then
+            value.configuration.rpspellbook_effect_bar_locked = false
         end
         if value.configuration.rpspellbook_update_notifications == nil then
             value.configuration.rpspellbook_update_notifications = true
