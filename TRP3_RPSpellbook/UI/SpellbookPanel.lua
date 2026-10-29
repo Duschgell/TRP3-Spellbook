@@ -1565,7 +1565,10 @@ function addon.SpellbookPanel.Create(parent, options)
     panel.content = content
     panel.spellSlots = createGridSlots(content)
 
-    local emptyState = addon.UIFactory.CreateLabel(content, theme.Fonts.body, addon.L("EMPTY_BOOK"), theme.Colors.text)
+    local emptyHost = CreateFrame("Frame", nil, content)
+    emptyHost:SetAllPoints(content)
+    emptyHost:EnableMouse(false)
+    local emptyState = addon.UIFactory.CreateLabel(emptyHost, theme.Fonts.body, addon.L("EMPTY_BOOK"), theme.Colors.text)
     emptyState:SetPoint("CENTER")
 
     local nextPageButton = addon.UIFactory.CreateButton(panel, ">", theme.Sizes.pageButtonWidth)
@@ -2067,7 +2070,13 @@ function addon.SpellbookPanel.Create(parent, options)
         end
         animate(panel, panel, "open")
     end)
-    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(panel, "book") end
+    if addon.SeasonalVisuals then
+        local foreground = { emptyHost }
+        for _, slot in ipairs(panel.spellSlots) do foreground[#foreground + 1] = slot end
+        addon.SeasonalVisuals.Attach(panel, "book", {
+            backgrounds = { bookSurface, content }, foreground = foreground,
+        })
+    end
     content:SetScript("OnSizeChanged", requestLayout)
     refreshLayout()
     requestLayout()

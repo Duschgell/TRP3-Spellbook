@@ -120,6 +120,26 @@ function motifs.flowers(p)
     fill(p, 0, 2, 5, 5, palette.gold, true)
 end
 
+function motifs.roses(p, index)
+    local color = index % 2 == 0 and palette.pink or { 0.8, 0.08, 0.18, 0.95 }
+    stroke(p, -14, 0, 14, -1, palette.green, 4)
+    fill(p, -9, 3, 10, 5, palette.green, true)
+    fill(p, 9, -3, 10, 5, palette.green, true)
+    for petal = 1, 5 do
+        local angle = petal * math.pi * 0.4
+        fill(p, math.cos(angle) * 4, math.sin(angle) * 4, 8, 8, color, true)
+    end
+    fill(p, 0, 0, 4, 4, palette.cream, true)
+end
+
+function motifs.skulls(p)
+    fill(p, 0, 0, 22, 24, palette.cream, true)
+    local texture = p.textures[p.used]
+    texture:SetTexture(307568)
+    texture:SetTexCoord(0.12, 0.88, 0.08, 0.9)
+    texture:SetVertexColor(1, 1, 1, 0.9)
+end
+
 function motifs.corn(p)
     stroke(p, -4, -7, 2, 7, palette.green, 2)
     stroke(p, -2, -8, 5, 4, palette.green, 2)

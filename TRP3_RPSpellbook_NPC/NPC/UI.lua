@@ -758,7 +758,10 @@ function archive.CreatePage(parent)
     page = CreateFrame("Frame", nil, parent)
     if parent then page:SetAllPoints(parent) end
     page:Hide()
-    local background = page:CreateTexture(nil, "BACKGROUND")
+    local backdrop = CreateFrame("Frame", nil, page)
+    backdrop:SetAllPoints(page)
+    backdrop:EnableMouse(false)
+    local background = backdrop:CreateTexture(nil, "BACKGROUND")
     background:SetAllPoints()
     background:SetColorTexture(0.11, 0.08, 0.045, 0.18)
     page.title, page.status = label(page, L("TITLE")), label(page, "", true)
@@ -834,7 +837,7 @@ function archive.CreatePage(parent)
         for _, field in pairs(page.profile.fields) do field:ClearFocus() end
     end)
     page:SetScript("OnSizeChanged", refresh)
-    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(page, "npc") end
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(page, "npc", { backgrounds = { backdrop } }) end
     return page
 end
 

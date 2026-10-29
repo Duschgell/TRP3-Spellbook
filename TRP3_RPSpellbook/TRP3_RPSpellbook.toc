@@ -133,5 +133,4 @@ UI\TRP3Integration.lua
 UI\TutorialView.lua
 UI\TutorialPractice.lua
 UI\TutorialTours.lua
-UI\SeasonalDebug.lua
 Core.lua
