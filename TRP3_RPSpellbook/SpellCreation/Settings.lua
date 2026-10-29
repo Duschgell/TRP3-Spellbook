@@ -21,6 +21,7 @@ local editorThemes = {
 }
 local listeners = {}
 local REDUCED_MOTION_KEY = "rpspellbook_fancy_reduced_motion"
+local SEASONAL_ENABLED_KEY = "rpspellbook_seasonal_enabled"
 
 local function notifyListeners()
     for _, listener in ipairs(listeners) do
@@ -78,6 +79,7 @@ function addon.SpellCreationSettings.Initialize()
         REDUCED_MOTION_KEY,
         false
     ) or not registerKey(
+        configuration, SEASONAL_ENABLED_KEY, true
         configuration,
         "rpspellbook_effect_bar_locked",
         false
@@ -96,6 +98,7 @@ function addon.SpellCreationSettings.Initialize()
             constants.SPELL_CREATION_SETTING_MAGIC_SUBTYPES,
             "rpspellbook_currently_effects",
             REDUCED_MOTION_KEY,
+            SEASONAL_ENABLED_KEY,
             "rpspellbook_effect_bar_locked",
             "rpspellbook_update_notifications",
         }, notifyListeners)
@@ -153,6 +156,19 @@ function addon.SpellCreationSettings.GetEditorTheme()
         end
     end
     return defaults.editorTheme
+end
+
+local function seasonalFlag(key, fallback)
+    local configuration = getConfiguration()
+    if configuration and type(configuration.getValue) == "function" then
+        local ok, value = pcall(configuration.getValue, key)
+        if ok and type(value) == "boolean" then return value end
+    end
+    return fallback
+end
+
+function addon.SpellCreationSettings.ShouldUseSeasonalThemes()
+    return seasonalFlag(SEASONAL_ENABLED_KEY, true)
 end
 
 function addon.SpellCreationSettings.GetTimeMode()
@@ -233,6 +249,11 @@ function addon.SpellCreationSettings.GetPageElements()
             title = addon.L("FANCY_REDUCED_MOTION"),
             help = addon.L("FANCY_REDUCED_MOTION_HELP"),
             configKey = REDUCED_MOTION_KEY,
+        },
+        {
+            inherit = "TRP3_ConfigCheck",
+            title = addon.L("SEASONAL_THEMES"),
+            configKey = SEASONAL_ENABLED_KEY,
         },
         {
             inherit = "TRP3_ConfigDropDown",

@@ -293,6 +293,7 @@ local function createWindow()
             addon.Logger.Error("Import debug attach failed: " .. tostring(attachError))
         end
     end
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(frame, "import") end
     return frame
 end
 

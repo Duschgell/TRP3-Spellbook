@@ -21,6 +21,7 @@ Locales\frFR.lua
 Bindings.lua
 Logger.lua
 Core\Runtime.lua
+Core\SeasonalCalendar.lua
 Core\Cache.lua
 Data\ReleaseNotes.lua
 Core\Onboarding.lua
@@ -56,6 +57,7 @@ Data\ImportedLibrary.lua
 Data\ArchiveCopy.lua
 GameMaster\PlayerState.lua
 Data\SoundCatalog.lua
+Data\SeasonalStyles.lua
 GameMaster\TurnSound.lua
 GameMaster\ActionCollection.lua
 GameMaster\SessionStore.lua
@@ -123,6 +125,9 @@ UI\GameMasterLayoutEditor.lua
 UI\BookAnimation.lua
 UI\BookScene.lua
 UI\FancyBookControls.lua
+UI\SeasonalOrnaments.lua
+UI\SeasonalCorners.lua
+UI\SeasonalVisuals.lua
 UI\SpellbookPanel.lua
 UI\ImportedLibraryPanel.lua
 Chat\Hyperlinks.lua

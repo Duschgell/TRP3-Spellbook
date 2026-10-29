@@ -25,6 +25,7 @@ local specs = {
     TRP3_RPSpellbook_CreationEditorTheme = enum("default", "midnight", "parchment", "emerald", "titan", "dynamic"),
     TRP3_RPSpellbook_BookPresentation = enum("default", "fancy"),
     rpspellbook_fancy_reduced_motion = "boolean",
+    rpspellbook_seasonal_enabled = "boolean",
     rpspellbook_effect_bar_locked = "boolean",
     rpspellbook_update_notifications = "boolean",
     TRP3_RPSpellbook_CreationMagicSubtypes = "boolean",
@@ -100,6 +101,13 @@ local function validate(value)
         if value.configuration.rpspellbook_fancy_reduced_motion == nil then
             value.configuration.rpspellbook_fancy_reduced_motion = false
         end
+        if value.configuration.rpspellbook_seasonal_enabled == nil then
+            value.configuration.rpspellbook_seasonal_enabled = true
+        end
+        for _, key in ipairs({ "rpspellbook_seasonal_sounds", "rpspellbook_seasonal_music" }) do
+            local retired = value.configuration[key]
+            if retired ~= nil and type(retired) ~= "boolean" then return false end
+            value.configuration[key] = nil
         if value.configuration.rpspellbook_effect_bar_locked == nil then
             value.configuration.rpspellbook_effect_bar_locked = false
         end

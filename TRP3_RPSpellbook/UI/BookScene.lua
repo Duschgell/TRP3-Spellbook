@@ -194,9 +194,11 @@ end
 local function setReadingLayer(state, reading)
     local level = state.panel:GetFrameLevel()
     state.reading = reading == true
-    state.host:SetFrameLevel(level + (reading and 0 or 40))
-    state.clip:SetFrameLevel(level + (reading and 0 or 41))
-    state.page:SetFrameLevel(level + (reading and 0 or 42))
+    local surface = state.panel.bookSurface
+    local backgroundLevel = surface and surface:GetFrameLevel() or level
+    state.host:SetFrameLevel(reading and backgroundLevel or level + 40)
+    state.clip:SetFrameLevel(reading and backgroundLevel or level + 41)
+    state.page:SetFrameLevel(reading and backgroundLevel or level + 42)
     state.ink:SetFrameLevel(level + (reading and 0 or 43))
     state.curl:SetFrameLevel(level + 48)
     state.hero:SetFrameLevel(level + 49)
