@@ -9,6 +9,9 @@ addon.Localization.Register("frFR", {
     ADDON_DESCRIPTION = "Un grimoire intégré à Total RP 3 pour les rôlistes.",
     ADDON_DISABLED = "Total RP 3 est indisponible.",
     ADDON_TITLE = "Grimoire",
+    SETTINGS_INTERFACE = "Interface",
+    SETTINGS_GAMEMASTER = "Mode maître du jeu",
+    SETTINGS_MISC = "Divers",
 
     ARCHIVE_AVAILABLE_FOR = "Disponible pendant %s",
     ARCHIVE_CHARACTERS = "Personnages",

@@ -9,6 +9,9 @@ addon.Localization.Register("enUS", {
     ADDON_DESCRIPTION = "A spellbook for roleplayers, integrated with Total RP 3.",
     ADDON_DISABLED = "Total RP 3 is unavailable.",
     ADDON_TITLE = "Spellbook",
+    SETTINGS_INTERFACE = "Interface",
+    SETTINGS_GAMEMASTER = "Game Master Mode",
+    SETTINGS_MISC = "Miscellaneous",
 
     ARCHIVE_AVAILABLE_FOR = "Available for %s",
     ARCHIVE_CHARACTERS = "Characters",

@@ -9,6 +9,9 @@ addon.Localization.Register("deDE", {
     ADDON_DESCRIPTION = "Ein Zauberbuch integriert in Total RP 3 für Rollenspieler.",
     ADDON_DISABLED = "Total RP 3 ist nicht verfügbar.",
     ADDON_TITLE = "Zauberbuch",
+    SETTINGS_INTERFACE = "Interface",
+    SETTINGS_GAMEMASTER = "Spielleitermodus",
+    SETTINGS_MISC = "Sonstiges",
 
     ARCHIVE_AVAILABLE_FOR = "Noch %s verfügbar",
     ARCHIVE_CHARACTERS = "Charaktere",

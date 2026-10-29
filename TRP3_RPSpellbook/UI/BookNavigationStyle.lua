@@ -3,8 +3,10 @@ local _, addon = ...
 local style = {}
 addon.BookNavigationStyle = style
 
-local headingFrame, driver, styledText, motionEnabled
+local driver, styledText, motionEnabled, initialized
+local headings = {}
 local animations = {}
+local submenuLabels, submenuButtons = {}, {}
 local FANCY_COLOR = { 0.30, 0.88, 0.81 }
 
 local function visible(frame)
@@ -47,10 +49,13 @@ function style.GetColor()
     return color[1], color[2], color[3]
 end
 
-function style.GetText()
-    local red, green, blue = style.GetColor()
+local function colorText(text, red, green, blue)
     return string.format("|cff%02x%02x%02x%s|r", math.floor(red * 255 + 0.5),
-        math.floor(green * 255 + 0.5), math.floor(blue * 255 + 0.5), addon.L("ADDON_TITLE"))
+        math.floor(green * 255 + 0.5), math.floor(blue * 255 + 0.5), text)
+end
+
+function style.GetText()
+    return colorText(addon.L("ADDON_TITLE"), style.GetColor())
 end
 
 local function stop(state)
@@ -82,15 +87,58 @@ local function animate(owner, label)
     end
 end
 
+local function restoreSubmenuIndent(button)
+    local state = submenuButtons[button]
+    local point = state and state.point
+    if point then
+        button:SetPoint(point[1], point[2], point[3], point[4], point[5])
+        state.point = nil
+    end
+end
+
+local function applySubmenuIndent(button)
+    local state = submenuButtons[button]
+    if not state then return end
+    if not submenuLabels[button:GetText()] then restoreSubmenuIndent(button); return end
+    if state.point then return end
+    for index = 1, button:GetNumPoints() do
+        local point, relativeTo, relativePoint, x, y = button:GetPoint(index)
+        if point == "TOPLEFT" then
+            state.point = { point, relativeTo, relativePoint, x, y }
+            button:SetPoint(point, relativeTo, relativePoint, x + 12, y)
+            return
+        end
+    end
+end
+
+local function refreshSubmenuButtons()
+    local container = _G.TRP3_MainFrameMenuContainer
+    if not container or not visible(container) then return end
+    for _, button in ipairs({ container:GetChildren() }) do
+        if type(button.GetText) == "function" and type(button.GetNumPoints) == "function"
+            and type(button.GetPoint) == "function" and type(button.HookScript) == "function" then
+            if not submenuButtons[button] then
+                submenuButtons[button] = {}
+                button:HookScript("OnShow", applySubmenuIndent)
+                button:HookScript("OnHide", restoreSubmenuIndent)
+            end
+            if visible(button) then applySubmenuIndent(button) end
+        end
+    end
+end
+
 local function refreshAnimations()
+    refreshSubmenuButtons()
     for owner, state in pairs(animations) do
         if not motionEnabled or not visible(owner)
-            or (owner ~= headingFrame and owner:GetText() ~= styledText) then
+            or (headings[owner] == nil and owner:GetText() ~= styledText) then
             stop(state)
         end
     end
     if not motionEnabled then return end
-    if headingFrame and visible(headingFrame) then animate(headingFrame, headingFrame.Title) end
+    for frame in pairs(headings) do
+        if visible(frame) then animate(frame, frame.Title) end
+    end
     local container = _G.TRP3_MainFrameMenuContainer
     if not container or not visible(container) then return end
     for _, button in ipairs({ container:GetChildren() }) do
@@ -109,7 +157,8 @@ local function onUpdate(self, elapsed)
 end
 
 function style.Refresh()
-    styledText = style.GetText()
+    local red, green, blue = style.GetColor()
+    styledText = colorText(addon.L("ADDON_TITLE"), red, green, blue)
     motionEnabled = addon.SpellCreationSettings.IsFancyMode()
         and not addon.SpellCreationSettings.ShouldReduceBookMotion()
     local api = _G.TRP3_API
@@ -123,8 +172,9 @@ function style.Refresh()
         end
         if changed and type(menu.rebuildMenu) == "function" then menu.rebuildMenu() end
     end
-    if headingFrame and headingFrame.Title:GetText() ~= styledText then
-        headingFrame.Title:SetText(styledText)
+    for frame, titleText in pairs(headings) do
+        local text = titleText and colorText(titleText, red, green, blue) or styledText
+        if frame.Title:GetText() ~= text then frame.Title:SetText(text) end
     end
     if driver then
         driver:SetScript("OnUpdate", motionEnabled and onUpdate or nil)
@@ -132,18 +182,21 @@ function style.Refresh()
     refreshAnimations()
 end
 
-function style.Initialize(frame)
-    if headingFrame then return end
-    headingFrame = frame
-    frame:HookScript("OnShow", style.Refresh)
-    addon.SpellCreationSettings.RegisterListener(style.Refresh)
-    local container = _G.TRP3_MainFrameMenuContainer
-    if container then
-        driver = CreateFrame("Frame", nil, container)
-        driver:SetScript("OnShow", style.Refresh)
-        driver:SetScript("OnHide", function()
-            for _, state in pairs(animations) do stop(state) end
-        end)
+function style.Initialize(frame, titleText)
+    if headings[frame] == nil then frame:HookScript("OnShow", style.Refresh) end
+    headings[frame] = titleText or false
+    if titleText then submenuLabels["    " .. titleText] = true end
+    if not initialized then
+        initialized = true
+        addon.SpellCreationSettings.RegisterListener(style.Refresh)
+        local container = _G.TRP3_MainFrameMenuContainer
+        if container then
+            driver = CreateFrame("Frame", nil, container)
+            driver:SetScript("OnShow", style.Refresh)
+            driver:SetScript("OnHide", function()
+                for _, state in pairs(animations) do stop(state) end
+            end)
+        end
     end
     style.Refresh()
 end
