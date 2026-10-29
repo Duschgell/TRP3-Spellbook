@@ -26,6 +26,8 @@ local specs = {
     TRP3_RPSpellbook_BookPresentation = enum("default", "fancy"),
     rpspellbook_fancy_reduced_motion = "boolean",
     rpspellbook_seasonal_enabled = "boolean",
+    rpspellbook_effect_bar_locked = "boolean",
+    rpspellbook_update_notifications = "boolean",
     TRP3_RPSpellbook_CreationMagicSubtypes = "boolean",
     rpspellbook_currently_effects = "boolean", rpspellbook_aura_nameplates = "boolean",
     toolbar_content_trp3_rpspellbook = "boolean",
@@ -106,6 +108,11 @@ local function validate(value)
             local retired = value.configuration[key]
             if retired ~= nil and type(retired) ~= "boolean" then return false end
             value.configuration[key] = nil
+        if value.configuration.rpspellbook_effect_bar_locked == nil then
+            value.configuration.rpspellbook_effect_bar_locked = false
+        end
+        if value.configuration.rpspellbook_update_notifications == nil then
+            value.configuration.rpspellbook_update_notifications = true
         end
         for key, item in pairs(value.configuration) do if not validPreference(key, item) then return false end end
         for _, key in ipairs(configKeys) do if value.configuration[key] == nil then return false end end
@@ -362,6 +369,10 @@ function backup.ApplyStartup()
             local live = _G.TRP3_RPSpellbookNPCDB
             for key in pairs(live) do live[key] = nil end
             for key, item in pairs(restoredNPC) do live[key] = item end
+            local presets = addon.SpellCreationPresets
+            if presets and presets.NormalizeSpell and type(live.book) == "table" then
+                for _, spell in pairs(live.book.spells or {}) do presets.NormalizeSpell(spell) end
+            end
         end)
     end
     applying, applied = false, true

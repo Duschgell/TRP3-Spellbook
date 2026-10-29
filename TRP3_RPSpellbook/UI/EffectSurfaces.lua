@@ -80,15 +80,18 @@ end
 local function updateTarget()
     local frame = _G.TRP3_TargetFrame
     if not frame then return end
-    if not targetStrip then targetStrip = addon.EffectIcons.Create(frame, 36, 6, 20) end
+    if not targetStrip then
+        targetStrip = addon.EffectIcons.Create(UIParent, 36, 6, 20)
+        frame:HookScript("OnHide", function() targetStrip:Hide() end)
+    end
     local player = frame:IsShown() and addon.EffectDisplay.UnitPlayerID("target")
     local anchor = frame.Header or frame
-    targetStrip:ClearAllPoints()
-    targetStrip:SetPoint("BOTTOM", anchor, "TOP", 0, 8)
+    targetStrip:SetScale(frame:GetEffectiveScale() / UIParent:GetEffectiveScale())
     addon.EffectIcons.Configure(targetStrip, { width = math.min(300, math.max(160, frame:GetWidth())),
         maxHeight = 80, minSize = 20, maxSize = 36, gap = 5 })
     if player then addon.TimedEffects.RequestSnapshot(player) end
     addon.EffectIcons.Update(targetStrip, player)
+    addon.EffectBar.Bind(targetStrip, anchor)
 end
 
 local function updateProfile()

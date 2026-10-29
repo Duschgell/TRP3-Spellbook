@@ -183,6 +183,7 @@ local function initializeCore()
         addon.Logger.Error(layoutError)
     end
 
+    if addon.VersionCheck then addon.VersionCheck.Initialize() end
     local communicationCallSuccess, communicationSuccess, communicationError =
         addon.Runtime.SafeInvoke(addon.Communication.Initialize)
     if not communicationCallSuccess then
@@ -259,6 +260,7 @@ function addon.Core.OnModuleStart()
     if addon.Onboarding then addon.Onboarding.Initialize() end
     if addon.TimedEffectsView then addon.TimedEffectsView.Initialize() end
     if addon.ExtendedAuras then addon.ExtendedAuras.Initialize() end
+    if addon.EffectBar then addon.EffectBar.Initialize() end
     if addon.CurrentlyEffects then addon.CurrentlyEffects.Initialize() end
     if addon.CurrentlyEffectsEditor then addon.CurrentlyEffectsEditor.Initialize() end
 

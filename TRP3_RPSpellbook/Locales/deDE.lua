@@ -1687,4 +1687,9 @@ addon.Localization.Register("deDE", {
     SEASONAL_MUSIC = "Saisonale Musik",
 
     YES = "Ja",
+    UPDATE_AVAILABLE = "Eine neue Version von Spellbook ist verfügbar: %s.",
+    UPDATE_NOTES_EMPTY = "Für diese Version ist kein Changelog verfügbar.",
+    UPDATE_NOTES_TITLE = "Was ist neu? (%s)",
+    UPDATE_SETTING = "Auf neue Versionen hinweisen",
+    UPDATE_SETTING_HELP = "Zeigt einen Hinweis, wenn andere Spieler eine neuere Version verwenden.",
 })

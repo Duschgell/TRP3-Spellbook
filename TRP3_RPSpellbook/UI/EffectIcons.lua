@@ -99,6 +99,10 @@ function icons.Create(parent, size, columns, maximum, passive)
             button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
             button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             button:SetScript("OnClick", function(_, mouse)
+                if mouse == "LeftButton" and button.effectBarDragged then
+                    button.effectBarDragged = nil
+                    return
+                end
                 if icons.IsSuppressed() or strip.profile ~= addon.Database.GetActiveProfileKey() then return end
                 if button.overflow then addon.TimedEffectsView.Open(strip.player); return end
                 if mouse == "LeftButton" and button.entry and not button.entry.native

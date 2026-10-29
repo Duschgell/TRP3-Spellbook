@@ -1666,6 +1666,12 @@ addon.Localization.Register("enUS", {
     UNKNOWN_ABILITY = "Unknown ability",
     UNKNOWN_LINK_MESSAGE = "Ability not found.",
 
+    UPDATE_AVAILABLE = "A new version of Spellbook is available: %s.",
+    UPDATE_NOTES_EMPTY = "No release notes are available for this version.",
+    UPDATE_NOTES_TITLE = "What's new? (%s)",
+    UPDATE_SETTING = "Show update notifications",
+    UPDATE_SETTING_HELP = "Notify me when other players use a newer version.",
+
     WHISPER_DURATION_ALL_ROUNDS = "all rounds",
     WHISPER_DURATION_MINUTE = "%d minute",
     WHISPER_DURATION_MINUTES = "%d minutes",

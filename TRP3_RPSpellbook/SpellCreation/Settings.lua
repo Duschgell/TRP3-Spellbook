@@ -80,6 +80,13 @@ function addon.SpellCreationSettings.Initialize()
         false
     ) or not registerKey(
         configuration, SEASONAL_ENABLED_KEY, true
+        configuration,
+        "rpspellbook_effect_bar_locked",
+        false
+    ) or not registerKey(
+        configuration,
+        "rpspellbook_update_notifications",
+        true
     ) then
         return false, addon.L("TRP3_API_UNAVAILABLE", "registerConfigKey")
     end
@@ -92,10 +99,13 @@ function addon.SpellCreationSettings.Initialize()
             "rpspellbook_currently_effects",
             REDUCED_MOTION_KEY,
             SEASONAL_ENABLED_KEY,
+            "rpspellbook_effect_bar_locked",
+            "rpspellbook_update_notifications",
         }, notifyListeners)
     end
     registerKey(configuration, "rpspellbook_aura_nameplates", false)
     addon.SpellCreationSettings.initialized = true
+    notifyListeners()
     return true
 end
 
@@ -198,9 +208,18 @@ function addon.SpellCreationSettings.ShouldPublishCurrentlyEffects()
     return false
 end
 
+function addon.SpellCreationSettings.ShouldNotifyUpdates()
+    local configuration = getConfiguration()
+    if configuration and type(configuration.getValue) == "function" then
+        local ok, value = pcall(configuration.getValue, "rpspellbook_update_notifications")
+        if ok and type(value) == "boolean" then return value end
+    end
+    return true
+end
+
 function addon.SpellCreationSettings.GetPageElements()
     local constants = addon.Constants
-    return {
+    local elements = {
         {
             inherit = "TRP3_ConfigH1",
             title = addon.L("SPELL_CREATION_SETTINGS_HEADER"),
@@ -208,6 +227,12 @@ function addon.SpellCreationSettings.GetPageElements()
         {
             inherit = "TRP3_ConfigParagraph",
             title = addon.L("SPELL_CREATION_SETTINGS_DESCRIPTION"),
+        },
+        {
+            inherit = "TRP3_ConfigCheck",
+            title = addon.L("UPDATE_SETTING"),
+            help = addon.L("UPDATE_SETTING_HELP"),
+            configKey = "rpspellbook_update_notifications",
         },
         {
             inherit = "TRP3_ConfigDropDown",
@@ -273,4 +298,30 @@ function addon.SpellCreationSettings.GetPageElements()
             configKey = "rpspellbook_currently_effects",
         },
     }
+    local api = _G.TRP3_API
+    if addon.Localization and type(addon.Localization.GetLanguage) == "function" and api and api.loc then
+        local languages = {
+            { _G.DEFAULT or addon.L("SPELL_CREATION_EDITOR_THEME_DEFAULT"), "client" },
+            { "English", "enUS" }, { "Deutsch", "deDE" }, { "Français", "frFR" },
+        }
+        table.insert(elements, 3, {
+            inherit = "TRP3_ConfigDropDown",
+            title = api.loc.CO_GENERAL_LOCALE,
+            listContent = languages,
+            listDefault = addon.Localization.GetLanguage(),
+            listCancel = true,
+            listCallback = function(language)
+                if language == addon.Localization.GetLanguage() then return end
+                local label
+                for _, entry in ipairs(languages) do if entry[2] == language then label = entry[1]; break end end
+                if not label or not api.popup or type(api.popup.showConfirmPopup) ~= "function" then return end
+                api.popup.showConfirmPopup(api.loc.CO_GENERAL_CHANGELOCALE_ALERT:format(label), function()
+                    if addon.Localization.SetLanguage(language) then ReloadUI() end
+                end)
+            end,
+        })
+    end
+    local effectElements = addon.EffectBar and addon.EffectBar.GetSettingsElements() or {}
+    for _, element in ipairs(effectElements) do elements[#elements + 1] = element end
+    return elements
 end

@@ -536,9 +536,13 @@ function addon.UIFactory.CreateTextArea(parent)
         scrollFrame:UpdateScrollChildRect()
         updateMouseBounds()
     end
-     
-     
+    local cursorPosition, cursorText = nil, editBox:GetText()
     editBox:HookScript("OnCursorChanged", function(self, x, y, width, height)
+        local position = self:GetCursorPosition()
+        if position == cursorPosition then
+            return
+        end
+        cursorPosition = position
         local top = math.max(0, -y)
         local bottom = top + height
         local viewport = math.max(1, scrollFrame:GetHeight())
@@ -554,6 +558,13 @@ function addon.UIFactory.CreateTextArea(parent)
     end)
     container:SetScript("OnSizeChanged", updateSize)
     editBox:SetScript("OnTextChanged", updateSize)
+    editBox:HookScript("OnTextChanged", function(self)
+        local text = self:GetText()
+        if text ~= cursorText then
+            cursorPosition = nil
+            cursorText = text
+        end
+    end)
     editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     container:EnableMouse(true)
     container:SetScript("OnMouseDown", function()

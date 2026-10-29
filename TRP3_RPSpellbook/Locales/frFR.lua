@@ -1689,4 +1689,9 @@ addon.Localization.Register("frFR", {
     SEASONAL_MUSIC = "Musique saisonnière",
 
     YES = "Oui",
+    UPDATE_AVAILABLE = "Une nouvelle version du Grimoire est disponible : %s.",
+    UPDATE_NOTES_EMPTY = "Aucune note de mise à jour n'est disponible pour cette version.",
+    UPDATE_NOTES_TITLE = "Quoi de neuf ? (%s)",
+    UPDATE_SETTING = "Signaler les nouvelles versions",
+    UPDATE_SETTING_HELP = "Signale les versions plus récentes utilisées par d'autres joueurs.",
 })
