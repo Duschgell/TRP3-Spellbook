@@ -31,8 +31,29 @@ local function canArrange(panel)
     return panel.editMode == true
 end
 
+local function playPageTurnSound()
+    local sound = type(TRP3_InterfaceSounds) == "table" and TRP3_InterfaceSounds.PageChange
+    if type(sound) ~= "number" then
+        sound = type(SOUNDKIT) == "table" and SOUNDKIT.IG_ABILITY_PAGE_TURN
+    end
+    if type(sound) == "number" and type(PlaySound) == "function" then
+        pcall(PlaySound, sound, "SFX")
+    end
+end
+
 local function animate(panel, frame, kind, callback, direction)
     if panel.bookClosing and kind ~= "close" then return end
+    if kind == "page" and type(callback) == "function" then
+        local commit = callback
+        callback = function()
+            local page, tab, favorites = panel.currentPage, panel.activeTabID, panel.favoritesOnly
+            commit()
+            if panel:IsVisible() and (panel.currentPage ~= page
+                or panel.activeTabID ~= tab or panel.favoritesOnly ~= favorites) then
+                playPageTurnSound()
+            end
+        end
+    end
     if panel.fancyPresentation and addon.BookScene
         and (kind == "page" or kind == "open" or kind == "close") then
         return addon.BookScene.Play(panel, kind, callback, direction)
@@ -1559,7 +1580,10 @@ function addon.SpellbookPanel.Create(parent, options)
     panel.content = content
     panel.spellSlots = createGridSlots(content)
 
-    local emptyState = addon.UIFactory.CreateLabel(content, theme.Fonts.body, addon.L("EMPTY_BOOK"), theme.Colors.text)
+    local emptyHost = CreateFrame("Frame", nil, content)
+    emptyHost:SetAllPoints(content)
+    emptyHost:EnableMouse(false)
+    local emptyState = addon.UIFactory.CreateLabel(emptyHost, theme.Fonts.body, addon.L("EMPTY_BOOK"), theme.Colors.text)
     emptyState:SetPoint("CENTER")
 
     local nextPageButton = addon.UIFactory.CreateButton(panel, ">", theme.Sizes.pageButtonWidth)
@@ -2074,6 +2098,13 @@ function addon.SpellbookPanel.Create(parent, options)
         end
         animate(panel, panel, "open")
     end)
+    if addon.SeasonalVisuals then
+        local foreground = { emptyHost }
+        for _, slot in ipairs(panel.spellSlots) do foreground[#foreground + 1] = slot end
+        addon.SeasonalVisuals.Attach(panel, "book", {
+            backgrounds = { bookSurface, content }, foreground = foreground,
+        })
+    end
     content:SetScript("OnSizeChanged", requestLayout)
     refreshLayout()
     requestLayout()

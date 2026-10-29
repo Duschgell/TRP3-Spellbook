@@ -341,6 +341,7 @@ local function onWorkflowLoaded()
     if not creationSuccess then
         addon.Logger.Error(tostring(creationError))
     end
+    if creationSuccess and addon.SeasonalVisuals then addon.SeasonalVisuals.RefreshSettings() end
 
     local settingsSuccess, settingsError = addon.GameMasterSettings.RegisterPage()
     if not settingsSuccess then

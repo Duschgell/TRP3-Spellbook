@@ -1686,6 +1686,10 @@ addon.Localization.Register("deDE", {
     WINDOW_MINIMIZE = "Fenster minimieren",
     WINDOW_RESTORE = "Fenster wiederherstellen",
 
+    SEASONAL_THEMES = "Saisonale Themes",
+    SEASONAL_SOUNDS = "Saisonale Klänge",
+    SEASONAL_MUSIC = "Saisonale Musik",
+
     YES = "Ja",
     UPDATE_AVAILABLE = "Eine neue Version von Spellbook ist verfügbar: %s.",
     UPDATE_NOTES_EMPTY = "Für diese Version ist kein Changelog verfügbar.",

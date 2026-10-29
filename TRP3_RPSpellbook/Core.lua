@@ -225,6 +225,7 @@ local function initializeCore()
     addon.Core.enabled = true
     addon.Core.initialized = true
     addon.Core.initializing = false
+    if addon.SeasonalVisuals then addon.SeasonalVisuals.Initialize() end
     if addon.Modules then addon.Modules.CoreReady() end
     return true
 end
