@@ -33,6 +33,7 @@ class FakeGitHub:
         self.change_dev_at = None
         self.reject = False
         self.newly_protected = set()
+        self.merged_branches = set()
 
     def reference(self, name):
         if name == "dev":
@@ -53,6 +54,9 @@ class FakeGitHub:
 
     def protected(self, name):
         return name in self.newly_protected
+
+    def was_merged(self, name):
+        return name in self.merged_branches
 
     def fast_forward(self, name, before, after):
         if self.before_update:
@@ -81,6 +85,32 @@ class SyncTests(unittest.TestCase):
         records = self.run_sync(client, apply=False)
         self.assertEqual(client.updates, [])
         self.assertEqual(records[0]["result"], "planned")
+
+    def test_merged_branches_are_not_updated_or_planned(self):
+        for apply in (False, True):
+            with self.subTest(apply=apply):
+                client = FakeGitHub([branch("feature/merged"), branch("bugfix/merged"),
+                                     branch("task/merged"), branch("feature/new")])
+                client.merged_branches.update(("feature/merged", "bugfix/merged", "task/merged"))
+                records = self.run_sync(client, apply=apply)
+                self.assertEqual(sum(row["result"] == "merged" for row in records), 3)
+                self.assertEqual(client.updates, [("feature/new", OLD, TARGET)] if apply else [])
+
+    def test_previously_auto_updated_merged_branch_still_stays_excluded(self):
+        client = FakeGitHub([branch("feature/merged", CHANGED)])
+        client.merged_branches.add("feature/merged")
+        records = self.run_sync(client)
+        self.assertEqual(client.updates, [])
+        self.assertEqual(records[-1]["result"], "merged")
+
+    def test_missing_pr_history_does_not_allow_update(self):
+        client = FakeGitHub()
+        def unavailable(name):
+            raise sync.SyncError("Pull request history unavailable")
+        client.was_merged = unavailable
+        with self.assertRaises(sync.SyncError):
+            self.run_sync(client)
+        self.assertEqual(client.updates, [])
 
     def test_unrelated_protected_and_current_branches_are_untouched(self):
         client = FakeGitHub([
@@ -188,6 +218,57 @@ class SyncTests(unittest.TestCase):
 class TransportTests(unittest.TestCase):
     def client(self):
         return sync.GitHub("owner/repo", "test-secret-not-real")
+
+    def pull_request(self, name="feature/new", repository="owner/repo", merged=True):
+        return {"merged_at": "2026-10-28T12:00:00Z" if merged else None,
+                "head": {"ref": name, "repo": {"full_name": repository}}}
+
+    def test_merged_pr_lookup_is_by_branch_history_not_current_sha(self):
+        api = self.client()
+        calls = []
+        def request(path, payload=None):
+            calls.append(path)
+            return [self.pull_request()]
+        api.request = request
+        self.assertTrue(api.was_merged("feature/new"))
+        query = sync.urllib.parse.parse_qs(sync.urllib.parse.urlsplit(calls[0]).query)
+        self.assertEqual(query["head"], ["owner:feature/new"])
+        self.assertEqual(query["state"], ["closed"])
+        self.assertNotIn("base", query)
+
+    def test_closed_unmerged_and_other_source_prs_do_not_exclude_branch(self):
+        api = self.client()
+        api.request = lambda *args: [self.pull_request(merged=False),
+                                    self.pull_request(repository="fork/repo"),
+                                    self.pull_request(name="feature/other"),
+                                    {"merged_at": "2026-10-28T12:00:00Z",
+                                     "head": {"ref": "feature/new", "repo": None}}]
+        self.assertFalse(api.was_merged("feature/new"))
+
+    def test_merged_pr_lookup_paginates_past_unmerged_entries(self):
+        api = self.client()
+        calls = []
+        def request(path, payload=None):
+            calls.append(path)
+            query = sync.urllib.parse.parse_qs(sync.urllib.parse.urlsplit(path).query)
+            return [self.pull_request(merged=False)] * 100 if query["page"] == ["1"] else [self.pull_request()]
+        api.request = request
+        self.assertTrue(api.was_merged("feature/new"))
+        self.assertEqual(len(calls), 2)
+
+    def test_invalid_or_unbounded_pr_history_fails_closed(self):
+        invalid = ({}, [{}], [{"merged_at": False}], [{"merged_at": ""}],
+                   [{"merged_at": "2026-10-28T12:00:00Z", "head": {}}],
+                   [self.pull_request(merged=False)] * 101)
+        for response in invalid:
+            with self.subTest(response_size=len(response)):
+                api = self.client(); api.request = lambda *args: response
+                with self.assertRaises(sync.SyncError):
+                    api.was_merged("feature/new")
+        api = self.client()
+        api.request = lambda *args: [self.pull_request(merged=False)] * 100
+        with self.assertRaises(sync.SyncError):
+            api.was_merged("feature/new")
 
     def test_mutation_requires_exact_old_oid_and_no_force(self):
         api = self.client()
@@ -381,6 +462,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("github.event_name == 'push'", workflow)
         self.assertIn("github.ref == 'refs/heads/dev'", workflow)
         self.assertIn("contents: write", workflow)
+        self.assertIn("      pull-requests: read", workflow)
         self.assertIn("persist-credentials: false", workflow)
         self.assertIn("sync_idle_branches.py --apply", workflow)
         self.assertNotIn("contents: write", checks)

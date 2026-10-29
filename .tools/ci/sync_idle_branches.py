@@ -120,6 +120,37 @@ class GitHub:
             raise SyncError("Invalid comparison revision")
         return self.request(f"/repos/{self.repository}/compare/{base}...{head}?per_page=1")
 
+    def was_merged(self, name):
+        if not eligible(name):
+            raise SyncError("Invalid merged-branch lookup target")
+        owner = self.repository.split("/", 1)[0]
+        for page in range(1, 101):
+            query = urllib.parse.urlencode({"state": "closed", "head": f"{owner}:{name}",
+                                            "per_page": 100, "page": page})
+            rows = self.request(f"/repos/{self.repository}/pulls?{query}")
+            if not isinstance(rows, list) or len(rows) > 100:
+                raise SyncError("Invalid pull request history")
+            for row in rows:
+                if (not isinstance(row, dict) or "merged_at" not in row
+                        or (row["merged_at"] is not None
+                            and (not isinstance(row["merged_at"], str) or not row["merged_at"]))):
+                    raise SyncError("Invalid pull request merge status")
+                if row["merged_at"] is None:
+                    continue
+                head = row.get("head")
+                if not isinstance(head, dict) or not valid_branch(head.get("ref")) or "repo" not in head:
+                    raise SyncError("Invalid merged pull request source")
+                repository = head["repo"]
+                if repository is None:
+                    continue
+                if not isinstance(repository, dict) or not isinstance(repository.get("full_name"), str):
+                    raise SyncError("Invalid merged pull request repository")
+                if head["ref"] == name and repository["full_name"].casefold() == self.repository.casefold():
+                    return True
+            if len(rows) < 100:
+                return False
+        raise SyncError("Pull request history exceeds pagination limit")
+
     def protected(self, name):
         if not eligible(name):
             raise SyncError("Invalid protection lookup target")
@@ -183,6 +214,9 @@ def synchronize(client, target, apply=False, report=None):
                 and type(comparison.get("behind_by")) is int and comparison["behind_by"] > 0
                 and isinstance(merge_base, dict) and merge_base.get("sha") == before):
             report({"branch": name, "result": "own-commits-or-unverified"})
+            continue
+        if client.was_merged(name):
+            report({"branch": name, "result": "merged"})
             continue
         if client.protected(name):
             report({"branch": name, "result": "protected-or-deleted"})
