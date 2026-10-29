@@ -296,6 +296,10 @@ addon.Localization.Register("frFR", {
 
     FANCY_REDUCED_MOTION = "Grimoire sans animations",
     FANCY_REDUCED_MOTION_HELP = "Désactive les animations du grimoire.",
+    FANCY_BUTTON_CLARITY = "Netteté du texte",
+    FANCY_BUTTON_CLARITY_HELP = "Atténue l'ombre du texte et améliore sa lisibilité.",
+    FANCY_BUTTON_BACKGROUND = "Fond des boutons",
+    FANCY_BUTTON_BACKGROUND_HELP = "Règle l'intensité du fond des boutons.",
 
     FAVORITES_ONLY = "Favoris uniquement",
 

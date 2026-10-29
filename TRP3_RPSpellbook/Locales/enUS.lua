@@ -296,6 +296,10 @@ addon.Localization.Register("enUS", {
 
     FANCY_REDUCED_MOTION = "Spellbook without animations",
     FANCY_REDUCED_MOTION_HELP = "Disables spellbook animations.",
+    FANCY_BUTTON_CLARITY = "Text sharpness",
+    FANCY_BUTTON_CLARITY_HELP = "Reduces text shadows and improves readability.",
+    FANCY_BUTTON_BACKGROUND = "Button background",
+    FANCY_BUTTON_BACKGROUND_HELP = "Adjusts the strength of button backgrounds.",
 
     FAVORITES_ONLY = "Favorites only",
 
