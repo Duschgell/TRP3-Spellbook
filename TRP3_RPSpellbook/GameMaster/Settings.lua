@@ -269,15 +269,17 @@ local function initializeSettingsButton(row)
     showSettingsButton(row.Button)
 end
 
-local function getPageElements(constants)
+local function getPageElements(constants, section)
     local elements = {
         {
             inherit = "TRP3_ConfigParagraph",
             title = addon.L("GAMEMASTER_SETTINGS_DESCRIPTION"),
+            settingsSection = "overview",
         },
         {
             inherit = "TRP3_ConfigH1",
             title = addon.L("GAMEMASTER_TEST_SETTINGS_HEADER"),
+            settingsSection = "misc",
             optionalModule = "gameMaster",
         },
         {
@@ -293,6 +295,7 @@ local function getPageElements(constants)
         {
             inherit = "TRP3_ConfigH1",
             title = addon.L("LAYOUT_SETTINGS_HEADER"),
+            settingsSection = "interface",
         },
         {
             inherit = "TRP3_ConfigButton",
@@ -309,6 +312,7 @@ local function getPageElements(constants)
         {
             inherit = "TRP3_ConfigH1",
             title = addon.L("CHAT_FALLBACK_SETTINGS_HEADER"),
+            settingsSection = "misc",
         },
         {
             inherit = "TRP3_ConfigCheck",
@@ -320,6 +324,7 @@ local function getPageElements(constants)
         {
             inherit = "TRP3_ConfigH1",
             title = addon.L("GAMEMASTER_SETTINGS_HEADER"),
+            settingsSection = "gamemaster",
             optionalModule = "gameMaster",
         },
         {
@@ -384,10 +389,12 @@ local function getPageElements(constants)
             help = addon.L("GAMEMASTER_CHAT_FALLBACK_HELP"),
             configKey =
                 constants.GAMEMASTER_SETTING_CHAT_FALLBACK,
+            settingsSection = "misc",
         },
         {
             inherit = "TRP3_ConfigH1",
             title = addon.L("GAMEMASTER_VISIBILITY_SETTINGS_HEADER"),
+            settingsSection = "gamemaster",
             optionalModule = "gameMaster",
         },
         {
@@ -442,23 +449,28 @@ local function getPageElements(constants)
     local creationElements =
         addon.SpellCreationSettings.GetPageElements()
     for index = #creationElements, 1, -1 do
+        creationElements[index].settingsSection = creationElements[index].configKey == "rpspellbook_update_notifications"
+            and "misc" or "interface"
         table.insert(elements, 6, creationElements[index])
     end
     local onboardingElements = addon.Onboarding
         and addon.Onboarding.GetSettingsElements()
         or {}
     for index = #onboardingElements, 1, -1 do
+        onboardingElements[index].settingsSection = "misc"
         table.insert(elements, 2, onboardingElements[index])
     end
     local visible = {}
+    local currentSection = "misc"
     for _, element in ipairs(elements) do
-        if not element.optionalModule or not addon.Modules
-            or addon.Modules.IsEnabled(element.optionalModule) then
+        currentSection = element.settingsSection or currentSection
+        if (not section or section == currentSection) and (not element.optionalModule or not addon.Modules
+            or addon.Modules.IsEnabled(element.optionalModule)) then
             element.optionalModule = nil
             visible[#visible + 1] = element
         end
     end
-    if addon.Modules and addon.Modules.IsEnabled("npc") then
+    if (not section or section == "misc") and addon.Modules and addon.Modules.IsEnabled("npc") then
         visible[#visible + 1] = {
             inherit = "TRP3_ConfigButton",
             title = addon.L("NPC_ARCHIVE_ENTRY"),
@@ -467,7 +479,7 @@ local function getPageElements(constants)
             callback = function() addon.Core.OpenNPCArchive() end,
         }
     end
-    if addon.BackupWindow then
+    if (not section or section == "misc") and addon.BackupWindow then
         visible[#visible + 1] = {
             inherit = "TRP3_ConfigButton",
             title = addon.L("BACKUP_TITLE"),
@@ -487,8 +499,8 @@ local function getPageElements(constants)
     return visible
 end
 
-function addon.GameMasterSettings.GetPageElements()
-    return getPageElements(addon.Constants)
+function addon.GameMasterSettings.GetPageElements(section)
+    return getPageElements(addon.Constants, section)
 end
 
 function addon.GameMasterSettings.GetBookToolbarIcon()
@@ -508,12 +520,12 @@ function addon.GameMasterSettings.GetBookToolbarIcon()
 end
 
 function addon.GameMasterSettings.RefreshBookIcon()
-    local button = addon.GameMasterSettings.bookIconButton
-    if not button then return end
     local icon = addon.Database.GetSpellbookIcon()
-    if button.bookIconValue ~= icon then
-        addon.UIFactory.SetIconTexture(button.iconTexture, icon, addon.Constants.DEFAULT_BOOK_ICON)
-        button.bookIconValue = icon
+    for _, button in ipairs(addon.GameMasterSettings.bookIconButtons or {}) do
+        if button.bookIconValue ~= icon then
+            addon.UIFactory.SetIconTexture(button.iconTexture, icon, addon.Constants.DEFAULT_BOOK_ICON)
+            button.bookIconValue = icon
+        end
     end
 end
 
@@ -526,7 +538,9 @@ local function initializeBookIcon(frame)
     frame.Title:SetPoint("TOPLEFT", frame, "TOPLEFT", 58, -20)
     frame.Title:SetPoint("RIGHT", frame, "RIGHT", -16, 0)
     if frame.Divider then frame.Divider:SetPoint("TOPLEFT", frame.Title, "BOTTOMLEFT", -42, -16) end
-    addon.GameMasterSettings.bookIconButton = button
+    addon.GameMasterSettings.bookIconButton = addon.GameMasterSettings.bookIconButton or button
+    addon.GameMasterSettings.bookIconButtons = addon.GameMasterSettings.bookIconButtons or {}
+    table.insert(addon.GameMasterSettings.bookIconButtons, button)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(addon.L("BOOK_ICON_CHANGE"))
@@ -557,6 +571,46 @@ local function initializeBookIcon(frame)
     addon.GameMasterSettings.RefreshBookIcon()
 end
 
+local function refreshControls(page, configuration)
+    if type(configuration.getValue) ~= "function" then return end
+    for _, element in ipairs(page.elements) do
+        local widget = element.widget
+        if widget and element.configKey then
+            local value = configuration.getValue(element.configKey)
+            if widget.Checkbox then
+                widget.Checkbox:SetChecked(value)
+            elseif widget.Dropdown then
+                widget.Dropdown:SetSelectedValue(value)
+            elseif widget.Slider and widget.Slider.Slider then
+                local slider = widget.Slider.Slider
+                if slider:GetValue() ~= value then slider:SetValue(value) end
+            end
+        end
+    end
+end
+
+local function refreshSubmenus()
+    local api = _G.TRP3_API
+    local menu = api and api.navigation and api.navigation.menu
+    if not menu or type(menu.getMenuItem) ~= "function" then return end
+    local pages = addon.GameMasterSettings.pages or {}
+    local active = false
+    for _, page in pairs(pages) do
+        if page.frame and page.frame:IsShown() then active = true; break end
+    end
+    local changed = false
+    for _, page in pairs(pages) do
+        if page.section then
+            local ok, item = pcall(menu.getMenuItem, "main_91_config_" .. page.id)
+            if ok and item and item.hidden ~= not active then
+                item.hidden = not active
+                changed = true
+            end
+        end
+    end
+    if changed and type(menu.rebuildMenu) == "function" then menu.rebuildMenu() end
+end
+
 function addon.GameMasterSettings.RegisterPage()
     if addon.GameMasterSettings.pageRegistered then
         return true
@@ -580,29 +634,60 @@ function addon.GameMasterSettings.RegisterPage()
     end
 
     local constants = addon.Constants
-    local page = {
-        id = constants.GAMEMASTER_SETTINGS_PAGE_ID,
-        menuText = addon.L("ADDON_TITLE"),
-        pageText = addon.L("ADDON_TITLE"),
-        elements = addon.GameMasterSettings.GetPageElements(),
+    local pageID = constants.GAMEMASTER_SETTINGS_PAGE_ID
+    local definitions = {
+        { id = pageID, title = addon.L("ADDON_TITLE") },
+        { id = pageID .. "_interface", title = addon.L("SETTINGS_INTERFACE"), section = "interface" },
+        { id = pageID .. "_gamemaster", title = addon.L("SETTINGS_GAMEMASTER"), section = "gamemaster" },
+        { id = pageID .. "_misc", title = addon.L("SETTINGS_MISC"), section = "misc" },
     }
-    local success, errorMessage = pcall(
-        configuration.registerConfigurationPage,
-        page
-    )
-    if not success then
-        return false, errorMessage
+    local api = _G.TRP3_API
+    local menu = api and api.navigation and api.navigation.menu
+    local parentMenuID = "main_91_config_" .. pageID
+    local pages = addon.GameMasterSettings.pages or {}
+    addon.GameMasterSettings.pages = pages
+    for index, definition in ipairs(definitions) do
+        if not pages[definition.id] then
+            local page = {
+                id = definition.id, menuText = definition.title, pageText = definition.title,
+                section = definition.section,
+                elements = addon.GameMasterSettings.GetPageElements(definition.section),
+            }
+            local success, errorMessage = pcall(configuration.registerConfigurationPage, page)
+            if not success then return false, errorMessage end
+            pages[page.id] = page
+            initializeBookIcon(page.frame)
+            page.frame:HookScript("OnShow", function()
+                refreshControls(page, configuration)
+                refreshSubmenus()
+            end)
+            page.frame:HookScript("OnHide", refreshSubmenus)
+            if menu and type(menu.getMenuItem) == "function" then
+                local ok, item = pcall(menu.getMenuItem, "main_91_config_" .. page.id)
+                if ok and item then
+                    item.sortGroup, item.sortIndex = parentMenuID, index
+                    item.align = "RIGHT"
+                    if definition.section then
+                        item.text = "    " .. definition.title
+                        item.hidden = true
+                    end
+                end
+            end
+            if addon.SeasonalVisuals then
+                local background = page.frame.Background
+                if background and type(background.SetUsingParentLevel) == "function" then
+                    background:SetUsingParentLevel(false)
+                end
+                addon.SeasonalVisuals.Attach(page.frame, "settings", { backgrounds = { background } })
+            end
+            if addon.BookNavigationStyle then
+                addon.BookNavigationStyle.Initialize(page.frame, definition.section and definition.title or nil)
+            end
+        end
     end
     addon.GameMasterSettings.pageRegistered = true
-    initializeBookIcon(page.frame)
-    if addon.SeasonalVisuals then
-        local background = page.frame.Background
-        if background and type(background.SetUsingParentLevel) == "function" then
-            background:SetUsingParentLevel(false)
-        end
-        addon.SeasonalVisuals.Attach(page.frame, "settings", { backgrounds = { background } })
-    end
-    if addon.BookNavigationStyle then addon.BookNavigationStyle.Initialize(page.frame) end
+    refreshSubmenus()
+    if menu and type(menu.rebuildMenu) == "function" then menu.rebuildMenu() end
     return true
 end
 
