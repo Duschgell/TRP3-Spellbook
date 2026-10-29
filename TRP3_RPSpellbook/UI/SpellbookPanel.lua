@@ -98,6 +98,18 @@ local function styleFancyButton(button, fancy)
             fontString:SetTextColor(1, 0.82, 0, 1)
         end
     end
+    if addon.UIFactory and type(addon.UIFactory.ApplyBookButtonContrast) == "function" then
+        addon.UIFactory.ApplyBookButtonContrast(button, fancy)
+    end
+end
+
+local function stylePanelText(panel, fancy)
+    local factory = addon.UIFactory
+    if not factory or type(factory.ApplyBookTextClarity) ~= "function" then return end
+    factory.ApplyBookTextClarity(panel.title, fancy)
+    factory.ApplyBookTextClarity(panel.searchBox, fancy)
+    factory.ApplyBookTextClarity(panel.searchBox and panel.searchBox.placeholder, fancy)
+    factory.ApplyBookTextClarity(panel.pageNumber, fancy, "page")
 end
 
 local function styleSpellEntry(slot, fancy)
@@ -145,7 +157,11 @@ end
 
 local function applyPanelPresentation(panel, fancy)
     local bookControls = not panel.archiveMode and not panel.readOnly
+    for _, button in ipairs(panel.presentationButtons or {}) do
+        styleFancyButton(button, fancy)
+    end
     if panel.fancyPresentation == fancy and panel.bookControlsEnabled == bookControls then
+        stylePanelText(panel, fancy)
         return false
     end
     if addon.BookAnimation then
@@ -351,9 +367,6 @@ local function applyPanelPresentation(panel, fancy)
     panel.profile:SetShown(not bookControls)
     if panel.title.SetJustifyH then panel.title:SetJustifyH(bookControls and "LEFT" or "CENTER") end
     if addon.FancyBookControls then addon.FancyBookControls.SetVisible(panel, bookControls) end
-    for _, button in ipairs(panel.presentationButtons or {}) do
-        styleFancyButton(button, fancy)
-    end
     if addon.UIFactory and type(addon.UIFactory.ApplyBookFont) == "function" then
         addon.UIFactory.ApplyBookFont(panel.title, fancy, 3)
         addon.UIFactory.ApplyBookFont(panel.profile, false, 0)
@@ -367,6 +380,7 @@ local function applyPanelPresentation(panel, fancy)
     if addon.UIFactory and type(addon.UIFactory.ApplyBookFieldStyle) == "function" then
         addon.UIFactory.ApplyBookFieldStyle(panel.searchBox, fancy)
     end
+    stylePanelText(panel, fancy)
     for _, slot in ipairs(panel.spellSlots or {}) do
         styleSpellEntry(slot, fancy)
     end
@@ -449,6 +463,7 @@ local function applyActiveTabTheme(panel, tab)
     panel.profile:SetTextColor(
         spec.textMuted[1], spec.textMuted[2], spec.textMuted[3], spec.textMuted[4]
     )
+    stylePanelText(panel, fancy)
     if panel.bookControlsEnabled then
         local name = addon.TRP3Bridge.GetActiveCharacterFirstName()
         panel.title:SetText(addon.L("BOOK_OWNER_TITLE", name or addon.L("UNKNOWN")))

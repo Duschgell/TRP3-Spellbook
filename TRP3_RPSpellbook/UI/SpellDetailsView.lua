@@ -498,6 +498,9 @@ function addon.SpellDetailsView.ApplyTheme(view, themeSpec, fancy, spell, backgr
                 1
             )
         end
+        if factory and type(factory.ApplyBookButtonContrast) == "function" then
+            factory.ApplyBookButtonContrast(button, fancy)
+        end
     end
     if view:IsShown() then layoutContent(view) end
     if addon.BookMagic then addon.BookMagic.SetText(view, view.name, spell, fancy, view.ownerPanel, view.description) end

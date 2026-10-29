@@ -296,6 +296,10 @@ addon.Localization.Register("deDE", {
 
     FANCY_REDUCED_MOTION = "Zauberbuch ohne Animationen",
     FANCY_REDUCED_MOTION_HELP = "Deaktiviert die Animationen im Zauberbuch.",
+    FANCY_BUTTON_CLARITY = "Schriftschärfe",
+    FANCY_BUTTON_CLARITY_HELP = "Vermindert Schriftschatten und verbessert die Lesbarkeit der Texte.",
+    FANCY_BUTTON_BACKGROUND = "Hintergrund der Knöpfe",
+    FANCY_BUTTON_BACKGROUND_HELP = "Regler für Hintergrundstärke der Knöpfe.",
 
     FAVORITES_ONLY = "Nur Favoriten",
 
