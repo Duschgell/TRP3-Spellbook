@@ -82,6 +82,7 @@ function addon.SpellCreationSettings.Initialize()
         false
     ) or not registerKey(
         configuration, SEASONAL_ENABLED_KEY, true
+    ) or not registerKey(
         configuration,
         BUTTON_CLARITY_KEY,
         0
@@ -301,6 +302,8 @@ function addon.SpellCreationSettings.GetPageElements()
             max = 100,
             step = 1,
             integer = true,
+        },
+        {
             inherit = "TRP3_ConfigCheck",
             title = addon.L("SEASONAL_THEMES"),
             configKey = SEASONAL_ENABLED_KEY,

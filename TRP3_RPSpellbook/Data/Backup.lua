@@ -108,6 +108,7 @@ local function validate(value)
             local retired = value.configuration[key]
             if retired ~= nil and type(retired) ~= "boolean" then return false end
             value.configuration[key] = nil
+        end
         if value.configuration.rpspellbook_effect_bar_locked == nil then
             value.configuration.rpspellbook_effect_bar_locked = false
         end
