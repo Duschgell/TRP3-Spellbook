@@ -45,7 +45,8 @@ local function createWindow()
     local frame = addon.UIFactory.CreateDialog(
         addon.L("IMPORTED_BOOKS"),
         theme.Sizes.importLibraryWidth,
-        theme.Sizes.importLibraryHeight
+        theme.Sizes.importLibraryHeight,
+        true
     )
 
     local intro = addon.UIFactory.CreateLabel(frame, theme.Fonts.small, addon.L("IMPORTED_BOOKS_HINT"), theme.Colors.textMuted)
@@ -87,6 +88,9 @@ local function createWindow()
     frame.previousButton = previousButton
     previousButton:SetScript("OnClick", function() state.page = state.page - 1 render() end)
     nextButton:SetScript("OnClick", function() state.page = state.page + 1 render() end)
+    if addon.SeasonalVisuals then
+        addon.SeasonalVisuals.Attach(frame, "import", { backgrounds = { frame.Background } })
+    end
     return frame
 end
 

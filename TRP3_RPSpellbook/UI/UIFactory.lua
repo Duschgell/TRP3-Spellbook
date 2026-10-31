@@ -6,6 +6,17 @@ local dialogOrder = 0
 local dialogs = setmetatable({}, { __mode = "k" })
 local spellIconEffectFrames = setmetatable({}, { __mode = "k" })
 local FANCY_BOOK_FONT = "Fonts\\MORPHEUS.TTF"
+local BOOK_BUTTON_BACKGROUNDS = {
+    normal = { 0.94, 0.85, 0.68, 0.96 },
+    disabled = { 0.87, 0.80, 0.67, 0.45 },
+    pressed = { 0.86, 0.74, 0.53, 0.96 },
+    hover = { 0.99, 0.91, 0.76, 0.96 },
+}
+local BOOK_TEXT_CLARITY = {
+    default = { contrast = 0.18, offset = 0.22, alpha = 0.55 },
+    button = { contrast = 0.40, offset = 0.32, alpha = 0.70 },
+    page = { contrast = 0, offset = 0.28, alpha = 0.65, color = { 0, 0, 0 } },
+}
 
 function addon.UIFactory.GetTutorialWindows()
     local result = {}
@@ -219,14 +230,28 @@ local function updateMinimalButtonVisual(button)
 
     local style = visual.style
     local background = style.buttonBackground
+    local emphasis = BOOK_BUTTON_BACKGROUNDS.normal
     if type(button.IsEnabled) == "function" and not button:IsEnabled() then
         background = style.buttonBackgroundDisabled
+        emphasis = BOOK_BUTTON_BACKGROUNDS.disabled
     elseif visual.pressed then
         background = style.buttonBackgroundPressed
+        emphasis = BOOK_BUTTON_BACKGROUNDS.pressed
     elseif type(button.IsMouseOver) == "function" and button:IsMouseOver() then
         background = style.buttonBackgroundHover
+        emphasis = BOOK_BUTTON_BACKGROUNDS.hover
     end
-    visual.background:SetColorTexture(unpackColor(background))
+    local strength = visual.bookBackground or 0
+    if strength > 0 then
+        visual.background:SetColorTexture(
+            background[1] + (emphasis[1] - background[1]) * strength,
+            background[2] + (emphasis[2] - background[2]) * strength,
+            background[3] + (emphasis[3] - background[3]) * strength,
+            background[4] + (emphasis[4] - background[4]) * strength
+        )
+    else
+        visual.background:SetColorTexture(unpackColor(background))
+    end
 end
 
 local function createMinimalButtonVisual(button)
@@ -328,6 +353,7 @@ function addon.UIFactory.ApplyButtonStyle(button, styleName, glyph)
     local minimal = styleName == "minimal"
     local custom = minimal or styleName == "book" or glyph == nil
     visual.active = custom
+    visual.bookBackground = 0
     visual.style = addon.Theme.GetGameMasterStyle(styleName)
 
     for _, native in ipairs(visual.nativeTextures) do
@@ -368,6 +394,70 @@ function addon.UIFactory.ApplyButtonStyle(button, styleName, glyph)
     if custom then
         updateMinimalButtonVisual(button)
     end
+end
+
+function addon.UIFactory.ApplyBookTextClarity(region, fancy, contrast)
+    local profile = BOOK_TEXT_CLARITY[contrast] or BOOK_TEXT_CLARITY.default
+    local settings = addon.SpellCreationSettings
+    local clarity = fancy and settings and settings.GetBookButtonClarity
+        and settings.GetBookButtonClarity() / 100 or 0
+    if not region then return clarity end
+    local state = region.spellbookTextClarity
+    if not state then
+        if clarity == 0 then return clarity end
+        state = {}
+        if type(region.GetShadowColor) == "function" and type(region.GetShadowOffset) == "function" then
+            state.shadow = { region:GetShadowColor() }
+            state.offset = { region:GetShadowOffset() }
+        end
+        region.spellbookTextClarity = state
+    end
+    if type(region.GetTextColor) == "function" and type(region.SetTextColor) == "function" then
+        local r, g, b, a = region:GetTextColor()
+        local applied = state.appliedColor
+        if not applied or math.abs(r - applied[1]) > 0.00001
+            or math.abs(g - applied[2]) > 0.00001 or math.abs(b - applied[3]) > 0.00001
+        then
+            state.color = { r, g, b }
+        end
+        local color = state.color
+        applied = applied or {}
+        if profile.color then
+            applied[1], applied[2], applied[3] =
+                color[1] + (profile.color[1] - color[1]) * clarity,
+                color[2] + (profile.color[2] - color[2]) * clarity,
+                color[3] + (profile.color[3] - color[3]) * clarity
+        else
+            local strength = 1 - (type(contrast) == "number" and contrast or profile.contrast) * clarity
+            applied[1], applied[2], applied[3] = color[1] * strength, color[2] * strength, color[3] * strength
+        end
+        applied[4] = a
+        region:SetTextColor(unpackColor(applied))
+        state.appliedColor = applied
+    end
+    if state.shadow then
+        local color, offset = state.shadow, state.offset
+        local ink = state.appliedColor or color
+        region:SetShadowColor(
+            color[1] + (ink[1] - color[1]) * clarity,
+            color[2] + (ink[2] - color[2]) * clarity,
+            color[3] + (ink[3] - color[3]) * clarity,
+            color[4] * (1 - clarity) + profile.alpha * clarity
+        )
+        region:SetShadowOffset(offset[1] * (1 - clarity) + profile.offset * clarity, offset[2] * (1 - clarity))
+    end
+    return clarity
+end
+
+function addon.UIFactory.ApplyBookButtonContrast(button, fancy)
+    local visual = button and button.spellbookMinimalVisual
+    if not visual then return end
+    local settings = addon.SpellCreationSettings
+    local clarity = addon.UIFactory.ApplyBookTextClarity(visual.fontString, fancy, "button")
+    visual.bookBackground = fancy and settings and settings.GetBookButtonBackground
+        and settings.GetBookButtonBackground() / 100 or 0
+    button:SetAlpha(fancy and (0.92 + 0.08 * clarity) or 1)
+    updateMinimalButtonVisual(button)
 end
 
 function addon.UIFactory.BringToFront(frame)
@@ -885,7 +975,7 @@ end
 function addon.UIFactory.SetColorButton(button, colorHex)
     button.colorTexture:SetColorTexture(addon.UIFactory.GetColorRGB(colorHex))
 end
-function addon.UIFactory.CreateDialog(titleText, width, height)
+function addon.UIFactory.CreateDialog(titleText, width, height, separateBackground)
     local theme = addon.Theme
     local frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     frame:SetSize(width, height)
@@ -907,13 +997,22 @@ function addon.UIFactory.CreateDialog(titleText, width, height)
     frame:HookScript("OnMouseDown", function(self)
         addon.UIFactory.BringToFront(self)
     end)
-    frame:SetBackdrop({
+    local background = frame
+    if separateBackground then
+        background = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+        background:SetAllPoints(frame)
+        background:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 3))
+        background:EnableMouse(false)
+        background:EnableMouseWheel(false)
+        frame.Background = background
+    end
+    background:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8X8",
         edgeFile = "Interface\\Buttons\\WHITE8X8",
         edgeSize = 1,
     })
-    frame:SetBackdropColor(unpackColor(theme.Colors.dark))
-    frame:SetBackdropBorderColor(unpackColor(theme.Colors.gold))
+    background:SetBackdropColor(unpackColor(theme.Colors.dark))
+    background:SetBackdropBorderColor(unpackColor(theme.Colors.gold))
 
     local title = addon.UIFactory.CreateLabel(frame, theme.Fonts.header, titleText, theme.Colors.gold)
     title:SetPoint("TOPLEFT", frame, "TOPLEFT", theme.Spacing.lg, -theme.Spacing.md)

@@ -8,6 +8,8 @@ local announced = addon.Cache.NewBounded(constants.VERSION_CHECK_HISTORY_LIMIT)
 local initialized, scheduled, sessionNotified, enteredWorld, readyAt, dialog
 local worldEntry, worldHandled
 local LINK_PREFIX = "addon:rpspellbook:version:"
+local previewOwner
+local installedScheduled
 
 local function parse(value)
     if type(value) ~= "string" or #value > constants.VERSION_CHECK_MAX_VERSION_BYTES then return end
@@ -17,6 +19,16 @@ local function parse(value)
     major, minor, patch = tonumber(major), tonumber(minor), tonumber(patch)
     if major > 999999 or minor > 999999 or patch > 999999 then return end
     return { major, minor, patch }, string.format("%d.%d.%d", major, minor, patch)
+end
+
+function check.GetCurrentVersion()
+    local _, version = parse(constants.ADDON_VERSION)
+    return version
+end
+
+function check.GetCurrentLink()
+    local version = check.GetCurrentVersion()
+    return version and LINK_PREFIX .. version or nil
 end
 
 local function higher(left, right)
@@ -45,6 +57,19 @@ local function confirmedNotes(entry)
         or count > constants.COMMUNICATION_MAX_PEERS then return nil, 0 end
     local notes = addon.ReleaseNotes.Copy(entry.notes)
     return notes, notes and count or 0
+end
+
+local function localNotes()
+    local parts, version = parse(constants.ADDON_VERSION)
+    if not parts then return end
+    return addon.ReleaseNotes.Get(constants.ADDON_VERSION) or addon.ReleaseNotes.Get(version)
+        or (parts[3] == 0 and addon.ReleaseNotes.Get(string.format("%d.%d", parts[1], parts[2]))) or nil
+end
+
+local function linkNotes(version)
+    if version == check.GetCurrentVersion() then return localNotes(), true end
+    local entry = announced:Get(version)
+    if entry then return confirmedNotes(entry), true end
 end
 
 local function rememberNotice(candidate)
@@ -81,6 +106,16 @@ local function showNotes(version, notes)
         text:SetJustifyV("TOP")
         text:SetWordWrap(true)
         scroll:SetScrollChild(child)
+        local function updateScrolling()
+            local overflow = child:GetHeight() > scroll:GetHeight()
+            scroll.ScrollBar:SetShown(overflow)
+            scroll:EnableMouseWheel(overflow)
+            if not overflow then scroll:SetVerticalScroll(0) end
+        end
+        scroll:HookScript("OnScrollRangeChanged", updateScrolling)
+        scroll:HookScript("OnSizeChanged", updateScrolling)
+        scroll:HookScript("OnShow", updateScrolling)
+        dialog.updateScrolling = updateScrolling
         local close = factory.CreateButton(dialog, addon.L("CLOSE"), 110)
         close:SetPoint("BOTTOMRIGHT", -20, 16)
         close:SetScript("OnClick", function() dialog:Hide() end)
@@ -91,7 +126,29 @@ local function showNotes(version, notes)
     dialog.content:SetHeight(math.max(1, dialog.text:GetStringHeight()))
     dialog.scroll:SetVerticalScroll(0)
     dialog:Show()
+    dialog.updateScrolling()
     addon.UIFactory.BringToFront(dialog)
+end
+
+function check.PreviewLink(owner, link)
+    if type(link) ~= "string" or link:sub(1, #LINK_PREFIX) ~= LINK_PREFIX then return false end
+    if #link > #LINK_PREFIX + constants.VERSION_CHECK_MAX_VERSION_BYTES then return true end
+    local version = link:sub(#LINK_PREFIX + 1)
+    local notes, known = linkNotes(version)
+    if known and GameTooltip then
+        GameTooltip:SetOwner(owner, "ANCHOR_CURSOR")
+        GameTooltip:SetText(addon.L("UPDATE_NOTES_TITLE", version), 1, 0.82, 0)
+        GameTooltip:AddLine(addon.ReleaseNotes.GetText(notes) or addon.L("UPDATE_NOTES_EMPTY"), 1, 1, 1, true)
+        GameTooltip:Show()
+        previewOwner = owner
+    end
+    return true
+end
+
+function check.HideLinkPreview(owner)
+    if previewOwner ~= owner then return end
+    if GameTooltip and GameTooltip:IsOwned(owner) then GameTooltip:Hide() end
+    previewOwner = nil
 end
 
 function check.HandleLink(link, button)
@@ -99,8 +156,8 @@ function check.HandleLink(link, button)
     if #link > #LINK_PREFIX + constants.VERSION_CHECK_MAX_VERSION_BYTES then return true end
     if button and button ~= "LeftButton" or IsModifiedClick and IsModifiedClick() then return true end
     local version = link:sub(#LINK_PREFIX + 1)
-    local entry = announced:Get(version)
-    if entry then showNotes(version, confirmedNotes(entry)) end
+    local notes, known = linkNotes(version)
+    if known then showNotes(version, notes) end
     return true
 end
 
@@ -161,9 +218,8 @@ local function notify()
         settings.versionCheckLastNotified = candidate.version
     end
     rememberNotice(candidate)
-    local link = "|cff33ff99|H" .. LINK_PREFIX .. candidate.version .. "|h[" .. candidate.version .. "]|h|r"
+    local link = "|cffffff00|H" .. LINK_PREFIX .. candidate.version .. "|h[" .. candidate.version .. "]|h|r"
     addon.Logger.Info(addon.L("UPDATE_AVAILABLE", link))
-    showNotes(candidate.version, candidate.notes)
 end
 
 schedule = function()
@@ -216,6 +272,33 @@ local function applyWorldEntry()
     enteredWorld = true
 end
 
+local function installedCandidate()
+    if not worldHandled then return end
+    local settings = savedSettings()
+    if not settings then return end
+    local current, version = parse(constants.ADDON_VERSION)
+    local previous = parse(settings.versionCheckInstalledNotified)
+    if not current or previous and not higher(current, previous) then return end
+    if not localNotes() then return end
+    return settings, version
+end
+
+local function scheduleInstalled()
+    if installedScheduled or not installedCandidate() then return end
+    if type(C_Timer) ~= "table" or type(C_Timer.After) ~= "function" then return end
+    installedScheduled = true
+    C_Timer.After(math.max(0, worldEntry.at + constants.VERSION_CHECK_LOGIN_DELAY
+        - addon.Runtime.GetMonotonicTime()), function()
+        installedScheduled = false
+        if type(InCombatLockdown) == "function" and InCombatLockdown() then return end
+        local settings, version = installedCandidate()
+        if not settings then return end
+        settings.versionCheckInstalledNotified = version
+        local link = "|cffffff00|H" .. LINK_PREFIX .. version .. "|h[v" .. version .. "]|h|r"
+        addon.Logger.Info(addon.L("UPDATE_INSTALLED", link))
+    end)
+end
+
 function check.Initialize()
     if initialized then return end
     initialized = true
@@ -235,6 +318,7 @@ function check.Initialize()
     end
     addon.Communication.RegisterPeerListener(onPeer)
     addon.SpellCreationSettings.RegisterListener(function() if bestCandidate() then schedule() end end)
+    scheduleInstalled()
 end
 
 local events = CreateFrame("Frame")
@@ -247,5 +331,6 @@ events:SetScript("OnEvent", function(_, event, initialLogin, reload)
     end
     if not initialized then return end
     applyWorldEntry()
+    scheduleInstalled()
     if bestCandidate() then schedule() end
 end)

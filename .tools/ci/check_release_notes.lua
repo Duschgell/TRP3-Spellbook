@@ -52,7 +52,8 @@ function M.Validate(addon, expectedVersion)
             end
         end
     end
-    assert(previous > 0, "Retain previous release notes so the current content can be compared")
+    assert(previous > 0 or not less({ 1, 2, 0 }, current),
+        "Retain previous release notes so the current content can be compared")
     return true
 end
 

@@ -1,0 +1,38 @@
+name: Dev Checks and Branch Sync
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-branch-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Dev checks
+    uses: ./.github/workflows/tests.yml
+
+  sync:
+    name: Fast-forward idle branches
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && needs.checks.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Check out tested dev revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Synchronize idle feature, bugfix and task branches
+        env:
+          GH_TOKEN: ${{ secrets.BRANCH_SYNC_TOKEN || github.token }}
+        run: python3 -I -B .tools/ci/sync_idle_branches.py --apply

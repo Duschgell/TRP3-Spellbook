@@ -21,6 +21,9 @@ local editorThemes = {
 }
 local listeners = {}
 local REDUCED_MOTION_KEY = "rpspellbook_fancy_reduced_motion"
+local BUTTON_CLARITY_KEY = "rpspellbook_fancy_button_clarity"
+local BUTTON_BACKGROUND_KEY = "rpspellbook_fancy_button_background"
+local SEASONAL_ENABLED_KEY = "rpspellbook_seasonal_enabled"
 
 local function notifyListeners()
     for _, listener in ipairs(listeners) do
@@ -78,6 +81,16 @@ function addon.SpellCreationSettings.Initialize()
         REDUCED_MOTION_KEY,
         false
     ) or not registerKey(
+        configuration, SEASONAL_ENABLED_KEY, true
+    ) or not registerKey(
+        configuration,
+        BUTTON_CLARITY_KEY,
+        0
+    ) or not registerKey(
+        configuration,
+        BUTTON_BACKGROUND_KEY,
+        0
+    ) or not registerKey(
         configuration,
         "rpspellbook_effect_bar_locked",
         false
@@ -96,6 +109,9 @@ function addon.SpellCreationSettings.Initialize()
             constants.SPELL_CREATION_SETTING_MAGIC_SUBTYPES,
             "rpspellbook_currently_effects",
             REDUCED_MOTION_KEY,
+            BUTTON_CLARITY_KEY,
+            BUTTON_BACKGROUND_KEY,
+            SEASONAL_ENABLED_KEY,
             "rpspellbook_effect_bar_locked",
             "rpspellbook_update_notifications",
         }, notifyListeners)
@@ -141,6 +157,26 @@ function addon.SpellCreationSettings.ShouldReduceBookMotion()
     return false
 end
 
+local function getButtonSetting(key)
+    local configuration = getConfiguration()
+    if configuration and type(configuration.getValue) == "function" then
+        local ok, value = pcall(configuration.getValue, key)
+        value = ok and tonumber(value) or nil
+        if value and value == value and value ~= math.huge and value ~= -math.huge then
+            return math.max(0, math.min(100, value))
+        end
+    end
+    return 0
+end
+
+function addon.SpellCreationSettings.GetBookButtonClarity()
+    return getButtonSetting(BUTTON_CLARITY_KEY)
+end
+
+function addon.SpellCreationSettings.GetBookButtonBackground()
+    return getButtonSetting(BUTTON_BACKGROUND_KEY)
+end
+
 function addon.SpellCreationSettings.GetEditorTheme()
     local configuration = getConfiguration()
     if configuration and type(configuration.getValue) == "function" then
@@ -153,6 +189,19 @@ function addon.SpellCreationSettings.GetEditorTheme()
         end
     end
     return defaults.editorTheme
+end
+
+local function seasonalFlag(key, fallback)
+    local configuration = getConfiguration()
+    if configuration and type(configuration.getValue) == "function" then
+        local ok, value = pcall(configuration.getValue, key)
+        if ok and type(value) == "boolean" then return value end
+    end
+    return fallback
+end
+
+function addon.SpellCreationSettings.ShouldUseSeasonalThemes()
+    return seasonalFlag(SEASONAL_ENABLED_KEY, true)
 end
 
 function addon.SpellCreationSettings.GetTimeMode()
@@ -233,6 +282,31 @@ function addon.SpellCreationSettings.GetPageElements()
             title = addon.L("FANCY_REDUCED_MOTION"),
             help = addon.L("FANCY_REDUCED_MOTION_HELP"),
             configKey = REDUCED_MOTION_KEY,
+        },
+        {
+            inherit = "TRP3_ConfigSlider",
+            title = addon.L("FANCY_BUTTON_CLARITY"),
+            help = addon.L("FANCY_BUTTON_CLARITY_HELP"),
+            configKey = BUTTON_CLARITY_KEY,
+            min = 0,
+            max = 100,
+            step = 1,
+            integer = true,
+        },
+        {
+            inherit = "TRP3_ConfigSlider",
+            title = addon.L("FANCY_BUTTON_BACKGROUND"),
+            help = addon.L("FANCY_BUTTON_BACKGROUND_HELP"),
+            configKey = BUTTON_BACKGROUND_KEY,
+            min = 0,
+            max = 100,
+            step = 1,
+            integer = true,
+        },
+        {
+            inherit = "TRP3_ConfigCheck",
+            title = addon.L("SEASONAL_THEMES"),
+            configKey = SEASONAL_ENABLED_KEY,
         },
         {
             inherit = "TRP3_ConfigDropDown",

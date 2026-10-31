@@ -9,6 +9,9 @@ addon.Localization.Register("enUS", {
     ADDON_DESCRIPTION = "A spellbook for roleplayers, integrated with Total RP 3.",
     ADDON_DISABLED = "Total RP 3 is unavailable.",
     ADDON_TITLE = "Spellbook",
+    SETTINGS_INTERFACE = "Interface",
+    SETTINGS_GAMEMASTER = "Game Master Mode",
+    SETTINGS_MISC = "Miscellaneous",
 
     ARCHIVE_AVAILABLE_FOR = "Available for %s",
     ARCHIVE_CHARACTERS = "Characters",
@@ -296,6 +299,10 @@ addon.Localization.Register("enUS", {
 
     FANCY_REDUCED_MOTION = "Spellbook without animations",
     FANCY_REDUCED_MOTION_HELP = "Disables spellbook animations.",
+    FANCY_BUTTON_CLARITY = "Text sharpness",
+    FANCY_BUTTON_CLARITY_HELP = "Reduces text shadows and improves readability.",
+    FANCY_BUTTON_BACKGROUND = "Button background",
+    FANCY_BUTTON_BACKGROUND_HELP = "Adjusts the strength of button backgrounds.",
 
     FAVORITES_ONLY = "Favorites only",
 
@@ -1667,6 +1674,7 @@ addon.Localization.Register("enUS", {
     UNKNOWN_LINK_MESSAGE = "Ability not found.",
 
     UPDATE_AVAILABLE = "A new version of Spellbook is available: %s.",
+    UPDATE_INSTALLED = "New in Spellbook %s.",
     UPDATE_NOTES_EMPTY = "No release notes are available for this version.",
     UPDATE_NOTES_TITLE = "What's new? (%s)",
     UPDATE_SETTING = "Show update notifications",
@@ -1689,6 +1697,8 @@ addon.Localization.Register("enUS", {
     WINDOW_CLOSE_CONFIRM_HINT = "Click again to close.",
     WINDOW_MINIMIZE = "Minimize window",
     WINDOW_RESTORE = "Restore window",
+
+    SEASONAL_THEMES = "Seasonal themes",
 
     YES = "Yes",
 })

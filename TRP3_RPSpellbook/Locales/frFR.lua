@@ -9,6 +9,9 @@ addon.Localization.Register("frFR", {
     ADDON_DESCRIPTION = "Un grimoire intégré à Total RP 3 pour les rôlistes.",
     ADDON_DISABLED = "Total RP 3 est indisponible.",
     ADDON_TITLE = "Grimoire",
+    SETTINGS_INTERFACE = "Interface",
+    SETTINGS_GAMEMASTER = "Mode maître du jeu",
+    SETTINGS_MISC = "Divers",
 
     ARCHIVE_AVAILABLE_FOR = "Disponible pendant %s",
     ARCHIVE_CHARACTERS = "Personnages",
@@ -296,6 +299,10 @@ addon.Localization.Register("frFR", {
 
     FANCY_REDUCED_MOTION = "Grimoire sans animations",
     FANCY_REDUCED_MOTION_HELP = "Désactive les animations du grimoire.",
+    FANCY_BUTTON_CLARITY = "Netteté du texte",
+    FANCY_BUTTON_CLARITY_HELP = "Atténue l'ombre du texte et améliore sa lisibilité.",
+    FANCY_BUTTON_BACKGROUND = "Fond des boutons",
+    FANCY_BUTTON_BACKGROUND_HELP = "Règle l'intensité du fond des boutons.",
 
     FAVORITES_ONLY = "Favoris uniquement",
 
@@ -1684,8 +1691,11 @@ addon.Localization.Register("frFR", {
     WINDOW_MINIMIZE = "Réduire la fenêtre",
     WINDOW_RESTORE = "Restaurer la fenêtre",
 
+    SEASONAL_THEMES = "Thèmes saisonniers",
+
     YES = "Oui",
     UPDATE_AVAILABLE = "Une nouvelle version du Grimoire est disponible : %s.",
+    UPDATE_INSTALLED = "Nouveautés du Grimoire %s.",
     UPDATE_NOTES_EMPTY = "Aucune note de mise à jour n'est disponible pour cette version.",
     UPDATE_NOTES_TITLE = "Quoi de neuf ? (%s)",
     UPDATE_SETTING = "Signaler les nouvelles versions",

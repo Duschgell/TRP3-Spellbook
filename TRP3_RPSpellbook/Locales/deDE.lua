@@ -9,6 +9,9 @@ addon.Localization.Register("deDE", {
     ADDON_DESCRIPTION = "Ein Zauberbuch integriert in Total RP 3 für Rollenspieler.",
     ADDON_DISABLED = "Total RP 3 ist nicht verfügbar.",
     ADDON_TITLE = "Zauberbuch",
+    SETTINGS_INTERFACE = "Interface",
+    SETTINGS_GAMEMASTER = "Spielleitermodus",
+    SETTINGS_MISC = "Sonstiges",
 
     ARCHIVE_AVAILABLE_FOR = "Noch %s verfügbar",
     ARCHIVE_CHARACTERS = "Charaktere",
@@ -296,6 +299,10 @@ addon.Localization.Register("deDE", {
 
     FANCY_REDUCED_MOTION = "Zauberbuch ohne Animationen",
     FANCY_REDUCED_MOTION_HELP = "Deaktiviert die Animationen im Zauberbuch.",
+    FANCY_BUTTON_CLARITY = "Schriftschärfe",
+    FANCY_BUTTON_CLARITY_HELP = "Vermindert Schriftschatten und verbessert die Lesbarkeit der Texte.",
+    FANCY_BUTTON_BACKGROUND = "Hintergrund der Knöpfe",
+    FANCY_BUTTON_BACKGROUND_HELP = "Regler für Hintergrundstärke der Knöpfe.",
 
     FAVORITES_ONLY = "Nur Favoriten",
 
@@ -1682,8 +1689,11 @@ addon.Localization.Register("deDE", {
     WINDOW_MINIMIZE = "Fenster minimieren",
     WINDOW_RESTORE = "Fenster wiederherstellen",
 
+    SEASONAL_THEMES = "Saisonale Themes",
+
     YES = "Ja",
     UPDATE_AVAILABLE = "Eine neue Version von Spellbook ist verfügbar: %s.",
+    UPDATE_INSTALLED = "Neu in Spellbook %s.",
     UPDATE_NOTES_EMPTY = "Für diese Version ist kein Changelog verfügbar.",
     UPDATE_NOTES_TITLE = "Was ist neu? (%s)",
     UPDATE_SETTING = "Auf neue Versionen hinweisen",
