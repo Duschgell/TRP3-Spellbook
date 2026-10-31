@@ -21,7 +21,7 @@ local function rejects(t, F, addon, expected)
 end
 
 return {
-    format = 1, area = "releaseNotes", count = 10,
+    format = 1, area = "releaseNotes", count = 11,
 
     { id = "release-notes.actual-runtime", run = function(t, api, F)
         t.eq(type(F.releaseCheck({ Constants = api.constants, ReleaseNotes = api.notes })), "boolean")
@@ -69,9 +69,21 @@ return {
     end },
 
     { id = "release-notes.exact-current-key-and-history", run = function(t, api, F)
-        rejects(t, F, subject(api, "1.2", { ["1.2"] = entry("New") }))
+        rejects(t, F, subject(api, "1.2.1", { ["1.2.1"] = entry("New") }))
         rejects(t, F, subject(api, "1.2", { ["1.1"] = entry("Old"), ["1.2.0"] = entry("New") }))
         rejects(t, F, subject(api, "1.2", { ["1.1"] = entry("Old"), ["1.1.0"] = entry("Old"), ["1.2"] = entry("New") }))
+    end },
+
+    { id = "release-notes.first-documented-release", run = function(t, api, F)
+        for _, current in ipairs({ "1.2", "1.2.0" }) do
+            t.eq(F.releaseCheck(subject(api, current, { [current] = entry("First") })), true)
+        end
+        for _, current in ipairs({ "1.2.1", "1.3", "2.0" }) do
+            rejects(t, F, subject(api, current, { [current] = entry("Next") }))
+            t.eq(F.releaseCheck(subject(api, current, { ["1.2.0"] = entry("First"), [current] = entry("Next") })), true)
+            rejects(t, F, subject(api, current, { ["1.2.0"] = entry("First"), [current] = entry("First") }))
+        end
+        rejects(t, F, subject(api, "1.2.0", { ["1.2.0"] = { enUS = "Incomplete" } }))
     end },
 
     { id = "release-notes.metadata-cannot-skip-check", run = function(t, api, F)

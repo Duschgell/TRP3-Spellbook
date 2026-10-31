@@ -204,7 +204,8 @@ local function createWindow()
     local frame = addon.UIFactory.CreateDialog(
         addon.L("IMPORT_CONTENT_TITLE"),
         theme.Sizes.importDialogWidth,
-        theme.Sizes.importDialogHeight
+        theme.Sizes.importDialogHeight,
+        true
     )
 
     local inputLabel = addon.UIFactory.CreateLabel(frame, theme.Fonts.body, addon.L("IMPORT_INPUT"), theme.Colors.gold)
@@ -293,7 +294,9 @@ local function createWindow()
             addon.Logger.Error("Import debug attach failed: " .. tostring(attachError))
         end
     end
-    if addon.SeasonalVisuals then addon.SeasonalVisuals.Attach(frame, "import") end
+    if addon.SeasonalVisuals then
+        addon.SeasonalVisuals.Attach(frame, "import", { backgrounds = { frame.Background } })
+    end
     return frame
 end
 

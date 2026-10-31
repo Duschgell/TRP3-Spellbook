@@ -975,7 +975,7 @@ end
 function addon.UIFactory.SetColorButton(button, colorHex)
     button.colorTexture:SetColorTexture(addon.UIFactory.GetColorRGB(colorHex))
 end
-function addon.UIFactory.CreateDialog(titleText, width, height)
+function addon.UIFactory.CreateDialog(titleText, width, height, separateBackground)
     local theme = addon.Theme
     local frame = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     frame:SetSize(width, height)
@@ -997,13 +997,22 @@ function addon.UIFactory.CreateDialog(titleText, width, height)
     frame:HookScript("OnMouseDown", function(self)
         addon.UIFactory.BringToFront(self)
     end)
-    frame:SetBackdrop({
+    local background = frame
+    if separateBackground then
+        background = CreateFrame("Frame", nil, frame, "BackdropTemplate")
+        background:SetAllPoints(frame)
+        background:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 3))
+        background:EnableMouse(false)
+        background:EnableMouseWheel(false)
+        frame.Background = background
+    end
+    background:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8X8",
         edgeFile = "Interface\\Buttons\\WHITE8X8",
         edgeSize = 1,
     })
-    frame:SetBackdropColor(unpackColor(theme.Colors.dark))
-    frame:SetBackdropBorderColor(unpackColor(theme.Colors.gold))
+    background:SetBackdropColor(unpackColor(theme.Colors.dark))
+    background:SetBackdropBorderColor(unpackColor(theme.Colors.gold))
 
     local title = addon.UIFactory.CreateLabel(frame, theme.Fonts.header, titleText, theme.Colors.gold)
     title:SetPoint("TOPLEFT", frame, "TOPLEFT", theme.Spacing.lg, -theme.Spacing.md)

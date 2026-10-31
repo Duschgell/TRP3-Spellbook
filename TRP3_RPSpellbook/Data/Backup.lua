@@ -25,6 +25,8 @@ local specs = {
     TRP3_RPSpellbook_CreationEditorTheme = enum("default", "midnight", "parchment", "emerald", "titan", "dynamic"),
     TRP3_RPSpellbook_BookPresentation = enum("default", "fancy"),
     rpspellbook_fancy_reduced_motion = "boolean",
+    rpspellbook_fancy_button_clarity = { minimum = 0, maximum = 100 },
+    rpspellbook_fancy_button_background = { minimum = 0, maximum = 100 },
     rpspellbook_seasonal_enabled = "boolean",
     rpspellbook_effect_bar_locked = "boolean",
     rpspellbook_update_notifications = "boolean",
@@ -100,6 +102,9 @@ local function validate(value)
          
         if value.configuration.rpspellbook_fancy_reduced_motion == nil then
             value.configuration.rpspellbook_fancy_reduced_motion = false
+        end
+        for _, key in ipairs({ "rpspellbook_fancy_button_clarity", "rpspellbook_fancy_button_background" }) do
+            if value.configuration[key] == nil then value.configuration[key] = 0 end
         end
         if value.configuration.rpspellbook_seasonal_enabled == nil then
             value.configuration.rpspellbook_seasonal_enabled = true

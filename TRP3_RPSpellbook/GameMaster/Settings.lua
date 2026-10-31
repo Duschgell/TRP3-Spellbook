@@ -571,6 +571,29 @@ local function initializeBookIcon(frame)
     addon.GameMasterSettings.RefreshBookIcon()
 end
 
+local function initializeVersionLabel(frame)
+    local check = addon.VersionCheck
+    local version = check and check.GetCurrentVersion()
+    if not version or not frame or not frame.Title then return end
+    local button = CreateFrame("Button", nil, frame)
+    local label = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetText("v" .. version)
+    label:SetTextColor(1, 1, 1, 1)
+    label:SetAllPoints(button)
+    button:SetSize(math.ceil(label:GetStringWidth()), math.ceil(label:GetStringHeight()) + 4)
+    local function position()
+        button:SetPoint("LEFT", frame.Title, "LEFT", frame.Title:GetStringWidth() + 8, 0)
+    end
+    button:SetScript("OnEnter", function(self) check.PreviewLink(self, check.GetCurrentLink()) end)
+    button:SetScript("OnLeave", function(self) check.HideLinkPreview(self) end)
+    button:SetScript("OnClick", function(_, mouseButton) check.HandleLink(check.GetCurrentLink(), mouseButton) end)
+    frame:HookScript("OnShow", position)
+    frame:HookScript("OnHide", function() check.HideLinkPreview(button) end)
+    frame.spellbookVersion = button
+    button.label = label
+    position()
+end
+
 local function refreshControls(page, configuration)
     if type(configuration.getValue) ~= "function" then return end
     for _, element in ipairs(page.elements) do
@@ -683,6 +706,7 @@ function addon.GameMasterSettings.RegisterPage()
             if addon.BookNavigationStyle then
                 addon.BookNavigationStyle.Initialize(page.frame, definition.section and definition.title or nil)
             end
+            initializeVersionLabel(page.frame)
         end
     end
     addon.GameMasterSettings.pageRegistered = true

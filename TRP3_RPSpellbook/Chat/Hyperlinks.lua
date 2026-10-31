@@ -279,6 +279,10 @@ local function resolve(link)
 end
 
 local function onHyperlinkEnter(frame, link, text)
+    if addon.VersionCheck and addon.VersionCheck.PreviewLink(frame, link) then
+        hoveredFrames[frame] = { kind = "version" }
+        return
+    end
     if addon.ChatLinks.IsSpellLink(link) then
         hoveredFrames[frame] = { kind = "legacy" }
         local _, spell = resolve(link)
@@ -302,10 +306,15 @@ local function onHyperlinkEnter(frame, link, text)
 end
 
 local function onHyperlinkLeave(frame)
-    if not hoveredFrames[frame] then
+    local state = hoveredFrames[frame]
+    if not state then
         return
     end
     hoveredFrames[frame] = nil
+    if state.kind == "version" then
+        addon.VersionCheck.HideLinkPreview(frame)
+        return
+    end
     addon.SpellTooltip.Hide()
 end
 

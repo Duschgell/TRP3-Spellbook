@@ -1674,6 +1674,7 @@ addon.Localization.Register("enUS", {
     UNKNOWN_LINK_MESSAGE = "Ability not found.",
 
     UPDATE_AVAILABLE = "A new version of Spellbook is available: %s.",
+    UPDATE_INSTALLED = "New in Spellbook %s.",
     UPDATE_NOTES_EMPTY = "No release notes are available for this version.",
     UPDATE_NOTES_TITLE = "What's new? (%s)",
     UPDATE_SETTING = "Show update notifications",
@@ -1698,8 +1699,6 @@ addon.Localization.Register("enUS", {
     WINDOW_RESTORE = "Restore window",
 
     SEASONAL_THEMES = "Seasonal themes",
-    SEASONAL_SOUNDS = "Seasonal sounds",
-    SEASONAL_MUSIC = "Seasonal music",
 
     YES = "Yes",
 })
