@@ -12,18 +12,22 @@ local modules = {
     presets = { "SpellCreation/Presets.lua", "SpellCreationPresets", "GetResources", "GetMagicTypes" },
     notes = { "Data/ReleaseNotes.lua", "ReleaseNotes", "Get", "GetVersions", "GetCurrent", "Copy" },
     portable = { "Data/PortableTable.lua", "PortableTable", "Encode", "Decode" },
+    deflate = { "Data/DeflateGuard.lua", "DeflateGuard", "MeasureZlib" },
+    runtime = { "Core/Runtime.lua", "Runtime", "NormalizeSoundPreset" },
+    schema = { "Data/Schema.lua", "Schema", "InitializeDatabase" },
     validators = {
         "Data/Validators.lua", "Validators", "ValidateSpell", "ValidateTab",
     },
     backup = {
-        "Data/BackupValidation.lua", "BackupValidation", "Clone", "Book", "Rebind",
+        "Data/BackupValidation.lua", "BackupValidation", "Clone", "Book", "Rebind", "Settings",
     },
 }
 local plans = {
     releaseNotes = { "constants", "extensions", "notes" },
     portable = { "portable" },
+    deflate = { "deflate" },
     validators = { "constants", "localization", "english", "german", "french", "presets", "validators" },
-    backup = { "constants", "portable", "localization", "english", "german", "french", "presets", "validators", "backup" },
+    backup = { "constants", "portable", "localization", "english", "german", "french", "presets", "validators", "runtime", "schema", "backup" },
 }
 
 local function environment()
@@ -92,6 +96,14 @@ function F.fresh(area)
     })
 
     local env, api = environment(), {}
+    if area == "deflate" then
+        local maximum, calls = env.math.max, 0
+        env.math.max = function(...)
+            calls = calls + 1
+            return maximum(...)
+        end
+        api.decoderWork = function() return calls end
+    end
     if area == "validators" or area == "backup" then
         local locale = "enUS"
         rawset(env, "GetLocale", function() return locale end)
@@ -122,6 +134,7 @@ function F.fresh(area)
         end
         api[key] = export
     end
+    if area == "backup" then api.packing = addon.BackupPacking end
     return api
 end
 

@@ -38,10 +38,16 @@ function codec.IsCompact(exportString)
     return exportString:sub(versionOffset, versionOffset):match("^%d$") ~= nil
 end
 
-function codec.Encode(payload)
+local function validLimit(value)
+    return type(value) == "number" and value > 0 and value < math.huge
+        and value % 1 == 0
+end
+
+function codec.EncodePayload(payload, maximumLength)
     if type(payload) ~= "string"
         or payload == ""
-        or #payload > constants.MAX_EXPORT_PAYLOAD_LENGTH
+        or not validLimit(maximumLength)
+        or #payload > maximumLength
     then
         return nil
     end
@@ -65,22 +71,13 @@ function codec.Encode(payload)
     if not encodedSuccessfully or type(encoded) ~= "string" or encoded == "" then
         return nil
     end
-    return COMPACT_MARKER .. encoded
+    return encoded
 end
 
-function codec.Decode(exportString)
-    if not codec.IsCompact(exportString) then
-        return nil, "not_compact"
-    end
-
-    local versionOffset = #constants.COMPACT_EXPORT_FORMAT_PREFIX + 1
-    local codecVersion = tonumber(exportString:sub(versionOffset, versionOffset))
-    if codecVersion ~= constants.COMPACT_EXPORT_CODEC_VERSION then
-        return nil, "unsupported"
-    end
-
-    local encoded = exportString:sub(#COMPACT_MARKER + 1)
-    if encoded == "" or #encoded > constants.MAX_EXPORT_STRING_LENGTH then
+function codec.DecodePayload(encoded, maximumEncodedLength, maximumPayloadLength)
+    if type(encoded) ~= "string" or encoded == ""
+        or not validLimit(maximumEncodedLength) or not validLimit(maximumPayloadLength)
+        or #encoded > maximumEncodedLength then
         return nil, "invalid"
     end
 
@@ -96,7 +93,7 @@ function codec.Decode(exportString)
 
     local measuredLength, measureError = addon.DeflateGuard.MeasureZlib(
         compressed,
-        constants.MAX_EXPORT_PAYLOAD_LENGTH
+        maximumPayloadLength
     )
     if not measuredLength then
         return nil, measureError == "too_large" and "too_large" or "invalid"
@@ -114,11 +111,25 @@ function codec.Decode(exportString)
     then
         return nil, "invalid"
     end
-    if #payload > constants.MAX_EXPORT_PAYLOAD_LENGTH then
+    if #payload > maximumPayloadLength then
         return nil, "too_large"
     end
     if #payload ~= measuredLength then
         return nil, "invalid"
     end
     return payload
+end
+
+function codec.Encode(payload)
+    local encoded = codec.EncodePayload(payload, constants.MAX_EXPORT_PAYLOAD_LENGTH)
+    return encoded and COMPACT_MARKER .. encoded or nil
+end
+
+function codec.Decode(exportString)
+    if not codec.IsCompact(exportString) then return nil, "not_compact" end
+    local versionOffset = #constants.COMPACT_EXPORT_FORMAT_PREFIX + 1
+    local codecVersion = tonumber(exportString:sub(versionOffset, versionOffset))
+    if codecVersion ~= constants.COMPACT_EXPORT_CODEC_VERSION then return nil, "unsupported" end
+    return codec.DecodePayload(exportString:sub(#COMPACT_MARKER + 1),
+        constants.MAX_EXPORT_STRING_LENGTH, constants.MAX_EXPORT_PAYLOAD_LENGTH)
 end

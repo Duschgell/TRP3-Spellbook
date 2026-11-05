@@ -1,5 +1,103 @@
 return {
-    format = 1, area = "backup", count = 4,
+    format = 1, area = "backup", count = 10,
+
+    { id = "backup.settings-rejects-lossy-normalization-without-mutation", run = function(t, api, F)
+        for _, settings in ipairs({
+            { gameMasterPlayer = { turnSoundPreset = "not-a-preset" } },
+            { gameMasterPlayer = { incomingActionSoundEnabled = "true" } },
+            { gameMasterPlayer = { incomingActionSoundPreset = "kit:0" } },
+            { onboarding = { progress = { npc = "invalid step" } } },
+        }) do
+            local original = F.copy(settings)
+            t.eq(api.backup.Settings(settings), false)
+            t.same(settings, original)
+        end
+    end },
+
+    { id = "backup.settings-preserves-extensions-and-absent-defaults", run = function(t, api, F)
+        for _, settings in ipairs({
+            {},
+            { extension = { magicType = "User text", [2] = false },
+                gameMasterPlayer = { turnSoundPreset = "kit:2147483647", extension = true },
+                onboarding = { revision = 0, completed = { npc = true }, progress = { npc = "step_1" } } },
+        }) do
+            local original = F.copy(settings)
+            t.eq(api.backup.Settings(settings), true)
+            t.same(settings, original)
+        end
+    end },
+
+    { id = "backup.pooled-legacy-and-typed-values-remain-independent", run = function(t, api, F)
+        for index = 1, 64 do
+            local first = F.spell({ id = "first", icon = 123, description = "Literal\000\255" .. index,
+                tags = { custom = "unchanged" }, resource = index % 2 == 0 and "" or false,
+                extra = { [0] = false, ["0"] = "distinct", [0.5] = index } })
+            if index % 3 == 0 then first.effects = { buff = true, durationRounds = 0 } end
+            local second = F.copy(first)
+            second.id, second.ownerKey = "second", "other"
+            local original = { first, second, literal = { version = 1, data = {}, references = {}, spells = {} } }
+            local packed = assert(api.packing.Encode(original))
+            local restored = assert(api.packing.Decode(packed))
+            t.same(restored, original)
+            restored[1].tags.custom = "changed"
+            t.eq(restored[2].tags.custom, "unchanged")
+            t.eq(original[1].tags.custom, "unchanged")
+        end
+    end },
+
+    { id = "backup.pooled-overlap-and-forged-paths-fail-closed", run = function(t, api, F)
+        local first = F.spell({ id = "first", icon = 123, tags = {}, effects = {},
+            description = string.rep("Synthetic description ", 20) })
+        local second = F.copy(first)
+        second.id = "second"
+        local encoded = assert(api.packing.Encode({ first, second }))
+        for _, mutate in ipairs({
+            function(wire) wire.references[1].index = 0 end,
+            function(wire) wire.references[1].index = 1.5 end,
+            function(wire) wire.references[1].path = { "missing" } end,
+            function(wire) wire.references[1].path = { false } end,
+            function(wire) wire.spells[1].ownerKey = false end,
+            function(wire) wire.data[1].description = "overlap" end,
+        }) do
+            local wire = assert(api.portable.Decode(encoded))
+            mutate(wire)
+            t.eq(api.packing.Decode(assert(api.portable.Encode(wire))), nil)
+        end
+    end },
+
+    { id = "backup.pooled-content-is-lossless-and-independent", run = function(t, api, F)
+        local first = F.spell({ id = "first", ownerKey = "source", createdAt = 1, updatedAt = 2, revision = 3,
+            icon = 123, resource = "Mana", range = "40 meters", description = string.rep("Synthetic description. ", 20),
+            tags = { magicType = "Arcane", extra = "custom" }, effects = { buff = true, durationRounds = 0 } })
+        local second = F.copy(first)
+        second.id, second.ownerKey, second.revision = "second", "other", 9
+        local original = { first = first, second = second, unknown = { enabled = false, empty = "" } }
+        local before = F.copy(original)
+        local packed = assert(api.packing.Encode(original))
+        local envelope = assert(api.portable.Decode(packed))
+        t.eq(#envelope.spells, 1)
+        t.eq(#envelope.references, 2)
+        local restored = assert(api.packing.Decode(packed))
+        t.same(restored, original)
+        t.same(original, before)
+        restored.first.tags.extra = "changed"
+        t.eq(restored.second.tags.extra, "custom")
+        t.eq(original.first.tags.extra, "custom")
+    end },
+
+    { id = "backup.pooled-references-and-expansion-are-bounded", run = function(t, api, F)
+        local spell = F.spell({ icon = 123, resource = "Mana", range = "40 meters",
+            description = string.rep("Synthetic. ", 100), tags = {}, effects = {} })
+        local source = { F.copy(spell), F.copy(spell) }
+        local encoded = assert(api.packing.Encode(source))
+        local envelope = assert(api.portable.Decode(encoded))
+        envelope.references[2].path = F.copy(envelope.references[1].path)
+        t.eq(api.packing.Decode(assert(api.portable.Encode(envelope))), nil)
+        t.eq(api.packing.Decode(encoded, { MAX_BYTES = #encoded - 1 }), nil)
+        t.eq(api.packing.Decode(encoded, { MAX_ENTRIES = 5 }), nil)
+        t.eq(api.packing.Decode(encoded, { MAX_DEPTH = 1 }), nil)
+        t.same(source, { spell, spell })
+    end },
 
     { id = "backup.valid-book-and-independent-clone", run = function(t, api, F)
 
