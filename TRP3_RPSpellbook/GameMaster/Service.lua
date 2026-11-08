@@ -1387,6 +1387,12 @@ local function cleanSpellSnapshot(rawSpell)
         return nil
     end
     cleaned.resource = sanitizeSpellText(cleaned.resource, true)
+    if cleaned.resources then
+        for index, value in ipairs(cleaned.resources) do
+            cleaned.resources[index] = sanitizeSpellText(value, true)
+        end
+        cleaned.resource = cleaned.resources[1]
+    end
     cleaned.range = sanitizeSpellText(cleaned.range, true)
     cleaned.castTime = sanitizeSpellText(cleaned.castTime, true)
     cleaned.cooldown = sanitizeSpellText(cleaned.cooldown, true)

@@ -25,7 +25,7 @@ local function formatMetadata(spell, fancy)
         end
     end
 
-    addLine(addon.L("FIELD_RESOURCE"), spell.resource)
+    addLine(addon.L("FIELD_RESOURCE"), table.concat(addon.SpellPresentation.GetResourceLines(spell), "\n"))
     addLine(addon.L("FIELD_RANGE"), spell.range)
     addLine(addon.L("FIELD_CAST_TIME"), spell.castTime)
     if addon.SpellPresentation.ShouldShowCooldown(spell.cooldown) then

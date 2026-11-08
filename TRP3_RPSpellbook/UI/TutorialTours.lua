@@ -291,7 +291,11 @@ local function rememberEditorDraft(frame, state, draft)
         magicSchool = addon.Constants.MAGIC_TAG_SCHOOL, damageType = addon.Constants.SPELL_TAG_DAMAGE_TYPE }) do
         if key and frame.fields[name] then draft.tags[key] = frame.fields[name]:GetText() end
     end
-    if frame.resourceControl then
+    if frame.GetResources then
+        local resources = frame.GetResources()
+        draft.resource = resources[1] or ""
+        draft.resources = #resources > 1 and resources or nil
+    elseif frame.resourceControl then
         local amount = frame.resourceControl.amount
         if amount:IsEnabled() and amount:GetText() ~= "" then
             draft.resource = amount:GetText() .. " " .. draft.resource

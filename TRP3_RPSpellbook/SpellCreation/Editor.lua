@@ -4,6 +4,8 @@ addon.SpellEditorWindow = {}
 
 local constants = addon.Constants
 local dialog
+local RESOURCE_ROW_HEIGHT = 34
+local MAX_RESOURCE_ROWS = 3
 local state = {
     applyingTimePreset = false,
     effects = {},
@@ -266,6 +268,30 @@ local function createTypeButton(parent, text)
             )
         end
     end)
+    return button
+end
+
+local function createResourceButton(parent, text)
+    local theme = addon.Theme
+    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    button:SetSize(18, 18)
+    button:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    button.label = addon.UIFactory.CreateLabel(button, theme.Fonts.small, text, theme.Colors.gold)
+    button.label:SetPoint("CENTER")
+    local function refresh(hovered)
+        button:SetBackdropColor(hovered and 0.14 or 0.035, hovered and 0.10 or 0.03, 0.025, 0.98)
+        local border = hovered and theme.Colors.gold or theme.Colors.border
+        button:SetBackdropBorderColor(border[1], border[2], border[3], 1)
+        local color = theme.Colors.gold
+        button.label:SetTextColor(hovered and 1 or color[1], hovered and 0.82 or color[2], hovered and 0 or color[3], 1)
+    end
+    button:SetScript("OnEnter", function() refresh(true) end)
+    button:SetScript("OnLeave", function() refresh(false) end)
+    refresh(false)
     return button
 end
 
@@ -618,7 +644,7 @@ local function createDescriptionField(parent, topOffset)
     field:HookScript("OnTextChanged", updateFocus)
     container:HookScript("OnShow", updateFocus)
     field.placeholder = placeholder
-    return field, label
+    return field, label, container
 end
 
 local function addCustomPresets(rootDescription, control, group, onSelected)
@@ -891,11 +917,13 @@ local function snapshotResource()
     if not dialog or not state.kind then
         return
     end
-    state.kindDrafts[state.kind] = {
-        amount = dialog.resourceControl.amount:GetText(),
-        amountEnabled = dialog.resourceControl.amount:IsEnabled(),
-        resource = dialog.resourceControl.field:GetText(),
-    }
+    local rows = {}
+    for index = 1, state.resourceCount or 1 do
+        local control = dialog.resourceControls[index]
+        rows[index] = { amount = control.amount:GetText(), resource = control.field:GetText(),
+            amountEnabled = control.amount:IsEnabled() }
+    end
+    state.kindDrafts[state.kind] = rows
 end
 
 local function setControlShown(control, shown)
@@ -910,12 +938,18 @@ end
 
 local function placePresetControl(control, topOffset)
     local theme = addon.Theme
+    local left = theme.Spacing.lg + theme.Sizes.editorLabelWidth
+    if control.amount then
+        control.amount:ClearAllPoints()
+        control.amount:SetPoint("TOPLEFT", dialog, "TOPLEFT", left, topOffset + theme.Spacing.xs)
+        left = left + 54 + theme.Spacing.xs
+    end
     control.label:ClearAllPoints()
     control.label:SetPoint("TOPLEFT", dialog, "TOPLEFT", theme.Spacing.lg, topOffset)
     control.field:ClearAllPoints()
     control.field:SetPoint(
         "TOPLEFT", dialog, "TOPLEFT",
-        theme.Spacing.lg + theme.Sizes.editorLabelWidth,
+        left,
         topOffset + theme.Spacing.xs
     )
 end
@@ -949,10 +983,14 @@ local function placeTabSelector(topOffset)
 end
 
 local function restoreResource(kind)
-    local draft = state.kindDrafts[kind] or {}
-    dialog.resourceControl.amount:SetText(draft.amount or "")
-    dialog.resourceControl.field:SetText(draft.resource or "")
-    dialog.resourceControl.amount:SetEnabled(draft.amountEnabled ~= false)
+    local rows = state.kindDrafts[kind] or {}
+    state.resourceCount = math.max(1, math.min(MAX_RESOURCE_ROWS, #rows))
+    for index, control in ipairs(dialog.resourceControls) do
+        local draft = rows[index] or {}
+        control.amount:SetText(draft.amount or "")
+        control.field:SetText(draft.resource or "")
+        control.amount:SetEnabled(draft.amountEnabled ~= false)
+    end
 end
 
 local function updateKindVisibility()
@@ -1002,11 +1040,34 @@ local function updateEffectPreview(enabled)
         preview:SetText(addon.L("WHISPER_PREVIEW") .. ": " .. (message or ""))
         height = (preview.GetStringHeight and preview:GetStringHeight() or 42) + 12
     end
-    dialog:SetHeight(addon.Theme.Sizes.dialogHeight + height)
+    dialog:SetHeight(addon.Theme.Sizes.dialogHeight + height
+        + ((state.resourceCount or 1) - 1) * RESOURCE_ROW_HEIGHT)
     return height
 end
 
 local function updateEffectVisibility()
+    local extraHeight = ((state.resourceCount or 1) - 1) * RESOURCE_ROW_HEIGHT
+    for index, control in ipairs(dialog.resourceControls) do
+        local shown = index <= (state.resourceCount or 1)
+        setControlShown(control, shown)
+        placePresetControl(control, -174 - (index - 1) * RESOURCE_ROW_HEIGHT)
+        if index > 1 then
+            control.label:Hide()
+            control.removeButton:SetShown(shown)
+        end
+    end
+    dialog.addResourceButton:SetShown((state.resourceCount or 1) < MAX_RESOURCE_ROWS)
+    for _, entry in ipairs({ { dialog.rangeControl, -208 }, { dialog.castTimeControl, -242 },
+        { dialog.cooldownControl, -276 }, { dialog.magicTypeControl, -448 },
+        { dialog.magicSchoolControl, -482 }, { dialog.damageTypeControl, -448 } }) do
+        placePresetControl(entry[1], entry[2] - extraHeight)
+    end
+    dialog.descriptionLabel:ClearAllPoints()
+    dialog.descriptionLabel:SetPoint("TOPLEFT", dialog, "TOPLEFT", addon.Theme.Spacing.lg, -310 - extraHeight)
+    dialog.descriptionContainer:ClearAllPoints()
+    dialog.descriptionContainer:SetPoint("TOPLEFT", dialog, "TOPLEFT",
+        addon.Theme.Spacing.lg + addon.Theme.Sizes.editorLabelWidth,
+        -310 + addon.Theme.Spacing.xs - extraHeight)
     local effects = state.effects or {}
     local mode = getPrimaryEffectMode(effects)
     local timed = mode ~= nil
@@ -1019,7 +1080,7 @@ local function updateEffectVisibility()
     dialog.effectMessageLabel:SetShown(enabled)
     dialog.fields.effectMessage:SetShown(enabled)
 
-    local row = state.kind == constants.SPELL_KIND_MAGIC and -516 or -482
+    local row = (state.kind == constants.SPELL_KIND_MAGIC and -516 or -482) - extraHeight
     if mode == "debuff" then
         placePresetControl(dialog.debuffTypeControl, row)
         row = row - 34
@@ -1125,25 +1186,36 @@ local function buildTags()
     return tags
 end
 
-local function buildResource()
-    local resource = trim(dialog.resourceControl.field:GetText())
-    local amount = trim(dialog.resourceControl.amount:GetText())
+local function buildResource(control)
+    local resource = trim(control.field:GetText())
+    local amount = trim(control.amount:GetText())
     resource = addon.SpellCreationPresets.FormatResource(resource, amount)
     if resource == "" then
         return ""
     end
-    if dialog.resourceControl.amount:IsEnabled() and amount ~= "" then
+    if control.amount:IsEnabled() and amount ~= "" then
         return amount .. " " .. resource
     end
     return resource
 end
 
+local function buildResources()
+    local resources = {}
+    for index = 1, state.resourceCount or 1 do
+        local value = buildResource(dialog.resourceControls[index])
+        if value ~= "" then resources[#resources + 1] = value end
+    end
+    return resources
+end
+
 local function buildSpellData()
+    local resources = buildResources()
     return {
         name = dialog.fields.name:GetText(),
         icon = state.icon,
         nameColor = state.nameColor,
-        resource = buildResource(),
+        resource = resources[1] or "",
+        resources = #resources > 1 and resources or nil,
         range = dialog.fields.range:GetText(),
         castTime = dialog.fields.castTime:GetText(),
         cooldown = dialog.fields.cooldown:GetText(),
@@ -1414,6 +1486,19 @@ local function createDialog()
         -174,
         true
     )
+    local resourceControls = { resourceControl }
+    local addResourceButton = createResourceButton(frame, "+")
+    addResourceButton:SetHeight(14)
+    addResourceButton:SetPoint("TOPLEFT", resourceControl.label, "BOTTOMLEFT", 0, 0)
+    for index = 2, MAX_RESOURCE_ROWS do
+        local control = createPresetField(frame, "", -174 - (index - 1) * RESOURCE_ROW_HEIGHT, true)
+        control.removeButton = createResourceButton(frame, "-")
+        control.removeButton:SetHeight(18)
+        control.removeButton:SetPoint("TOPLEFT", control.label, "TOPLEFT", 0, theme.Spacing.xs)
+        setControlShown(control, false)
+        control.removeButton:Hide()
+        resourceControls[index] = control
+    end
     local rangeControl = createPresetField(
         frame,
         addon.L("FIELD_RANGE"),
@@ -1434,7 +1519,7 @@ local function createDialog()
     )
     attachFieldPlaceholder(castTimeControl.field)
     attachFieldPlaceholder(cooldownControl.field)
-    local description, descriptionLabel =
+    local description, descriptionLabel, descriptionContainer =
         createDescriptionField(frame, -310)
     local magicTypeControl = createPresetField(
         frame,
@@ -1492,40 +1577,28 @@ local function createDialog()
     if effectMessagePreview.SetMaxLines then effectMessagePreview:SetMaxLines(3) end
     effectMessagePreview:Hide()
 
-    local function refreshResourceName()
-        local field = resourceControl.field
-        local text = addon.SpellCreationPresets.FormatResource(
-            field:GetText(), resourceControl.amount:GetText()
-        )
-        if text ~= field:GetText() then field:SetText(text) end
-    end
-    resourceControl.amount:HookScript("OnTextChanged", refreshResourceName)
-
-    resourceControl.field:HookScript("OnTextChanged", function()
-        if not state.applyingResourcePreset
-            and not resourceControl.amount:IsEnabled()
-        then
-            resourceControl.amount:SetEnabled(true)
+    for _, itemControl in ipairs(resourceControls) do
+        local control = itemControl
+        local function refreshResourceName()
+            local text = addon.SpellCreationPresets.FormatResource(control.field:GetText(), control.amount:GetText())
+            if text ~= control.field:GetText() then control.field:SetText(text) end
         end
-    end)
-
-    setSimplePresetMenu(
-        resourceControl,
-        function()
-            return addon.SpellCreationPresets.GetResources(state.kind)
-        end,
-        function(item)
-            state.applyingResourcePreset = true
-            resourceControl.amount:SetEnabled(item.allowsAmount ~= false)
-            if item.allowsAmount == false then
-                resourceControl.amount:SetText("")
+        control.amount:HookScript("OnTextChanged", refreshResourceName)
+        control.field:HookScript("OnTextChanged", function()
+            if not state.applyingResourcePreset and not control.amount:IsEnabled() then
+                control.amount:SetEnabled(true)
             end
-            refreshResourceName()
-            state.applyingResourcePreset = false
-        end,
-        nil,
-        "resource"
-    )
+        end)
+        setSimplePresetMenu(control,
+            function() return addon.SpellCreationPresets.GetResources(state.kind) end,
+            function(item)
+                state.applyingResourcePreset = true
+                control.amount:SetEnabled(item.allowsAmount ~= false)
+                if item.allowsAmount == false then control.amount:SetText("") end
+                refreshResourceName()
+                state.applyingResourcePreset = false
+            end, nil, "resource")
+    end
 
     setSimplePresetMenu(
         rangeControl, addon.SpellCreationPresets.GetRanges,
@@ -1719,10 +1792,17 @@ local function createDialog()
     frame.magicSchoolLabel = magicSchoolControl.label
     frame.magicTypeLabel = magicTypeControl.label
     frame.resourceControl = resourceControl
+    frame.resourceControls = resourceControls
+    frame.GetResources = buildResources
+    frame.addResourceButton = addResourceButton
+    frame.rangeControl = rangeControl
+    frame.castTimeControl = castTimeControl
+    frame.cooldownControl = cooldownControl
     frame.previousTab = previousTab
     frame.tabName = tabName
     frame.kindLabel = kindLabel
     frame.descriptionLabel = descriptionLabel
+    frame.descriptionContainer = descriptionContainer
     frame.tabLabel = tabLabel
     frame.themeLabels = {
         iconLabel,
@@ -1782,6 +1862,42 @@ local function createDialog()
         cancelButton,
         deleteButton,
     }
+    for index, control in ipairs(resourceControls) do
+        frame.themeText[#frame.themeText + 1] = control.amount
+        frame.themeFields[#frame.themeFields + 1] = control.amount
+        control.amount:HookScript("OnTextChanged", refreshIconPreview)
+        if index > 1 then
+            frame.fields["resource" .. index] = control.field
+            frame.themeText[#frame.themeText + 1] = control.field
+            frame.themeFields[#frame.themeFields + 1] = control.field
+            local rowIndex = index
+            control.removeButton:SetScript("OnClick", function()
+                if rowIndex > (state.resourceCount or 1) then return end
+                for slot = rowIndex, state.resourceCount - 1 do
+                    local current, following = resourceControls[slot], resourceControls[slot + 1]
+                    current.field:SetText(following.field:GetText())
+                    current.amount:SetText(following.amount:GetText())
+                    current.amount:SetEnabled(following.amount:IsEnabled())
+                end
+                local last = resourceControls[state.resourceCount]
+                last.field:ClearFocus()
+                last.amount:ClearFocus()
+                last.field:SetText("")
+                last.amount:SetText("")
+                last.amount:SetEnabled(true)
+                state.resourceCount = state.resourceCount - 1
+                updateEffectVisibility()
+                refreshIconPreview()
+            end)
+        end
+    end
+    addResourceButton:SetScript("OnClick", function()
+        if (state.resourceCount or 1) >= MAX_RESOURCE_ROWS then return end
+        state.resourceCount = (state.resourceCount or 1) + 1
+        updateEffectVisibility()
+        resourceControls[state.resourceCount].field:SetFocus()
+        refreshIconPreview()
+    end)
     frame:HookScript("OnShow", refreshEditorTheme)
     for _, field in ipairs({ effectMessage, nameField, durationControl.field,
         magicTypeControl.field, magicSchoolControl.field }) do
@@ -1792,7 +1908,6 @@ local function createDialog()
     for _, field in pairs(frame.fields) do
         field:HookScript("OnTextChanged", refreshIconPreview)
     end
-    resourceControl.amount:HookScript("OnTextChanged", refreshIconPreview)
     for _, button in ipairs({ magicButton, abilityButton, buffToggle, healingToggle }) do
         button:HookScript("OnClick", refreshIconPreview)
     end
@@ -1810,11 +1925,11 @@ local function splitResource(value, kind)
         if text == item.label then
             return "", text, item.allowsAmount
         end
-        local amount, resource = text:match("^(%d+)%s+(.+)$")
         if amount and resource == item.label and item.allowsAmount then
             return amount, resource, true
         end
     end
+    if amount and #amount <= 5 then return amount, resource, true end
     return "", text, true
 end
 
@@ -1907,15 +2022,12 @@ local function prepareDialog(tabID, spell, onChanged, storage, onDelete, draft)
     local tags = spell and spell.tags or {}
     state.legacyTags = copyLegacyTags(tags)
     local kind = spell and getSpellKind(spell) or getAdaptiveKind()
-    local amount, resource, amountEnabled = splitResource(
-        spell and spell.resource or "",
-        kind
-    )
-    state.kindDrafts[kind] = {
-        amount = amount,
-        amountEnabled = amountEnabled,
-        resource = resource,
-    }
+    local resourceLines = addon.SpellPresentation.GetResourceLines(spell)
+    state.kindDrafts[kind] = {}
+    for index = 1, math.max(1, #resourceLines) do
+        local amount, resource, amountEnabled = splitResource(resourceLines[index] or "", kind)
+        state.kindDrafts[kind][index] = { amount = amount, resource = resource, amountEnabled = amountEnabled }
+    end
     dialog.fields.magicType:SetText(
         tags[constants.MAGIC_TAG_TYPE] or tags.Magieart or ""
     )

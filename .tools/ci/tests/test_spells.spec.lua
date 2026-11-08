@@ -6,7 +6,7 @@ local function invalid(t, validators, input)
 end
 
 return {
-    format = 1, area = "validators", count = 6,
+    format = 1, area = "validators", count = 8,
 
     { id = "validators.normalizes-without-mutation", run = function(t, api, F)
 
@@ -146,6 +146,43 @@ return {
             local valid, cleaned = api.validators.ValidateSpell(F.spell({ tags = { magicType = text } }))
             t.eq(valid, true)
             t.eq(cleaned.tags.magicType, text)
+        end
+    end },
+
+    { id = "validators.resource-array-bounds-and-canonical-primary", run = function(t, api, F)
+        local input = F.spell({ resource = "stale", resources = { "5 Mana", "Custom", string.rep("x", 80) } })
+        local before = F.copy(input)
+        local valid, cleaned = api.validators.ValidateSpell(input)
+        t.eq(valid, true)
+        t.eq(cleaned.resource, cleaned.resources[1])
+        t.eq(#cleaned.resources, 3)
+        t.same(input, before)
+        for _, resources in ipairs({ false, "Mana", {}, { "" }, { 1 }, { "Mana", false },
+            { [2] = "Mana" }, { "Mana", [3] = "Energy" }, { "Mana", other = "Custom" },
+            { "Mana", string.rep("x", 81) }, { "A", "B", "C", "D" } }) do
+            invalid(t, api.validators, F.spell({ resources = resources }))
+        end
+        local singleOK, single = api.validators.ValidateSpell(F.spell({ resources = { "Mana" } }))
+        t.eq(singleOK, true); t.eq(single.resource, "Mana"); t.eq(single.resources, nil)
+        local legacyOK, legacy = api.validators.ValidateSpell(F.spell({ resource = "Custom cost" }))
+        t.eq(legacyOK, true); t.eq(legacy.resource, "Custom cost"); t.eq(legacy.resources, nil)
+        t.same(api.validators.GetPatchedResources(input, { resource = "Focus" }), { "Focus", "Custom", string.rep("x", 80) })
+        t.eq(api.validators.GetPatchedResources(input, { resource = "Focus", clearOptionalFields = true }), nil)
+        t.eq(api.validators.GetPatchedResources(input, { clearOptionalFields = true }), nil)
+        t.same(api.validators.GetPatchedResources(input, { resources = { "Only one" }, clearOptionalFields = true }), { "Only one" })
+    end },
+
+    { id = "validators.resource-array-translations", run = function(t, api, F)
+        for _, locale in ipairs({ "enUS", "deDE", "frFR" }) do
+            api.setLocale(locale)
+            local valid, spell = api.validators.ValidateSpell(F.spell({ resources = {
+                "1 red essences", "3 blue essence", "Custom authored cost",
+            } }))
+            t.eq(valid, true)
+            t.eq(spell.resources[1], "1 " .. api.localization.Get("PRESET_RESOURCE_ESSENCE_RED"))
+            t.eq(spell.resources[2], "3 " .. api.localization.Get("PRESET_RESOURCE_ESSENCE_BLUE_PLURAL"))
+            t.eq(spell.resources[3], "Custom authored cost")
+            t.eq(spell.resource, spell.resources[1])
         end
     end },
 

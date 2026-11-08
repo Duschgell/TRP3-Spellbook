@@ -2,6 +2,11 @@ local _, addon = ...
 
 addon.ReleaseNotes = {}
 local releases = {
+    ["1.2.1"] = {
+        enUS = "- The option to specify up to 3 different resources per spell",
+        deDE = "- Die Möglichkeit, bis zu 3 unterschiedliche Ressourcen pro Zauber anzugeben",
+        frFR = "- La possibilité d'indiquer jusqu'à 3 ressources différentes par sort",
+    },
     ["1.2.0"] = {
         enUS = "- (optional) seasonal decorations to give your spellbook a little more flair\n"
             .. "- You can now move and anchor your buffs and debuffs wherever you want\n"

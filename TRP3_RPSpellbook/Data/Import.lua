@@ -415,11 +415,34 @@ local function decodeSpellBlock(readField, formatVersion)
         }
     end
 
+    local resources
+    if formatVersion >= 6 then
+        local countText, countError = readField()
+        if countText == nil then return nil, countError end
+        local count = parseInteger(countText, 0, addon.Validators.Limits.MAX_RESOURCES_PER_SPELL - 1)
+        if count == nil then return nil, addon.L("IMPORT_INVALID_PAYLOAD") end
+        if count > 0 then
+            if #fields[6] > addon.Validators.Limits.MAX_SHORT_FIELD_LENGTH then
+                return nil, addon.L("IMPORT_INVALID_PAYLOAD")
+            end
+            resources = { sanitizeText(fields[6], false) }
+            for index = 2, count + 1 do
+                local entry, entryError = readField()
+                if entry == nil then return nil, entryError end
+                if #entry > addon.Validators.Limits.MAX_SHORT_FIELD_LENGTH then
+                    return nil, addon.L("IMPORT_INVALID_PAYLOAD")
+                end
+                resources[index] = sanitizeText(entry, false)
+            end
+        end
+    end
+
     local candidate = {
         name = sanitizeText(fields[2], false),
         icon = icon,
         nameColor = sanitizeText(fields[5], false),
         resource = sanitizeText(fields[6], false),
+        resources = resources,
         range = sanitizeText(fields[7], false),
         castTime = sanitizeText(fields[8], false),
         cooldown = sanitizeText(fields[9], false),
