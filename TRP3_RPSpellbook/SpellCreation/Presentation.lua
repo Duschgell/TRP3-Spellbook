@@ -48,6 +48,20 @@ local function normalized(value)
     return value and string.lower(value) or nil
 end
 
+function addon.SpellPresentation.GetResourceLines(spell)
+    local lines = {}
+    if type(spell) ~= "table" then return lines end
+    if type(spell.resources) == "table" then
+        for index = 1, math.min(3, #spell.resources) do
+            local value = trimmed(spell.resources[index])
+            if value then lines[#lines + 1] = value end
+        end
+    elseif hasText(spell.resource) then
+        lines[1] = spell.resource
+    end
+    return lines
+end
+
 local function getBuffType(spell)
     local tags = type(spell) == "table" and spell.tags or nil
     if type(tags) ~= "table" then return nil end

@@ -3,7 +3,8 @@ local addon = private.Shared or private
 local archive, codec = addon.NPCArchive, addon.PortableTable
 local transfer = {}
 archive.Transfer = transfer
-local PREFIX = "RPSBNPC1:"
+local PREFIX = "RPSBNPC2:"
+local LEGACY_PREFIX = "RPSBNPC1:"
 local plans = setmetatable({}, { __mode = "k" })
 
 local function count(values) local n = 0; for _ in pairs(values) do n = n + 1 end; return n end
@@ -148,7 +149,10 @@ function transfer.Export(npcID)
     if not clean then return nil, "TRANSFER_INVALID" end
     envelope.npcs, envelope.book = clean.npcs, clean.book
     local encoded, err = codec.Encode(envelope)
-    return encoded and PREFIX .. encoded or nil, err
+    if not encoded then return nil, err end
+    local compressed = addon.ExportCodec.EncodePayload(encoded, codec.MAX_BYTES)
+    if not compressed or #compressed > codec.MAX_BYTES then return nil, "TRANSFER_INVALID" end
+    return PREFIX .. compressed
 end
 
 local function resolveStringID(original, values, matches)
@@ -258,10 +262,16 @@ end
 local function prepare(input, mode)
     if mode ~= "merge" and mode ~= "replace" then return nil, "TRANSFER_INVALID" end
     if editorBusy() then return nil, "TRANSFER_EDITOR" end
-    if type(input) ~= "string" or #input > codec.MAX_BYTES + #PREFIX or input:sub(1, #PREFIX) ~= PREFIX then
+    if type(input) ~= "string" or #input > codec.MAX_BYTES + #PREFIX then
         return nil, "TRANSFER_INVALID"
     end
-    local decoded = codec.Decode(input:sub(#PREFIX + 1))
+    local prefix, payload = input:sub(1, #PREFIX), input:sub(#PREFIX + 1)
+    if prefix == PREFIX then
+        payload = addon.ExportCodec.DecodePayload(payload, codec.MAX_BYTES, codec.MAX_BYTES)
+    elseif prefix ~= LEGACY_PREFIX then
+        return nil, "TRANSFER_INVALID"
+    end
+    local decoded = payload and codec.Decode(payload)
     local incoming = decoded and validate(decoded)
     if not incoming then return nil, "TRANSFER_INVALID" end
     local current = archive.GetTransferState()

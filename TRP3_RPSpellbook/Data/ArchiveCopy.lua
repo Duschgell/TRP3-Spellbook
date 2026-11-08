@@ -39,6 +39,7 @@ local function copySpellData(sourceSpell)
         icon = sourceSpell.icon,
         nameColor = sourceSpell.nameColor,
         resource = sourceSpell.resource,
+        resources = sourceSpell.resources,
         range = sourceSpell.range,
         castTime = sourceSpell.castTime,
         cooldown = sourceSpell.cooldown,

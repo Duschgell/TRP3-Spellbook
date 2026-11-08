@@ -2,7 +2,7 @@ local _, addon = ...
 local backup, validation = {}, addon.BackupValidation
 addon.Backup = backup
 backup.MAX_BYTES = validation.Limits.MAX_BYTES + 12
-local PREFIX = "RPSBBACKUP1:"
+local PREFIX = "RPSBBACKUP2:"
 local plans = setmetatable({}, { __mode = "k" })
 local applying, applied, waiting = false, false, false
 
@@ -95,7 +95,7 @@ local function validate(value)
         or (value.scope ~= "npc") ~= (value.configuration ~= nil) then return false end
     if ownsCore and not validation.Core(value.core) then return false end
     if ownsNPC and not validation.NPC(value.npc) then return false end
-    if value.settings ~= nil and type(value.settings) ~= "table" then return false end
+    if value.settings ~= nil and not validation.Settings(value.settings) then return false end
     if value.configuration then
         if type(value.configuration) ~= "table" then return false end
          
@@ -129,9 +129,22 @@ end
 local function encode(value)
     local ok, valid = pcall(validate, value)
     if not ok or not valid then return nil, "BACKUP_INVALID" end
-    local payload = addon.PortableTable.Encode(value, validation.Limits)
-    if not payload then return nil, "BACKUP_LIMIT" end
-    return PREFIX .. payload
+    if not addon.BackupPacking or not addon.ExportCodec then return nil, "EXPORT_FAILED" end
+    local packed = addon.BackupPacking.Encode(value, validation.Limits)
+    if not packed then return nil, "BACKUP_LIMIT" end
+    local compressed = addon.ExportCodec.EncodePayload(packed, validation.Limits.MAX_BYTES)
+    if not compressed then return nil, "EXPORT_FAILED" end
+    if #compressed > validation.Limits.MAX_BYTES then return nil, "BACKUP_LIMIT" end
+    return PREFIX .. compressed
+end
+
+local function decode(input)
+    if type(input) ~= "string" or #input > backup.MAX_BYTES then return nil end
+    if input:sub(1, #PREFIX) ~= PREFIX
+        or not addon.BackupPacking or not addon.ExportCodec then return nil end
+    local payload = addon.ExportCodec.DecodePayload(input:sub(#PREFIX + 1),
+        validation.Limits.MAX_BYTES, validation.Limits.MAX_BYTES)
+    return payload and addon.BackupPacking.Decode(payload, validation.Limits) or nil
 end
 
 function backup.Export(scope)
@@ -160,18 +173,21 @@ function backup.Export(scope)
 end
 
 function backup.Prepare(input, sourceProfile, destinationProfile)
-    if type(input) ~= "string" or #input > backup.MAX_BYTES or input:sub(1, #PREFIX) ~= PREFIX then return nil, "BACKUP_INVALID" end
-    local value = addon.PortableTable.Decode(input:sub(#PREFIX + 1), validation.Limits)
+    local value = decode(input)
     local ok, valid = pcall(validate, value)
     if not ok or not valid then return nil, "BACKUP_INVALID" end
     if value.npc and not npcAvailable() then return nil, "BACKUP_NPC_UNAVAILABLE" end
-    if sourceProfile ~= nil and (not value.core or not validation.Rebind(value.core, sourceProfile, destinationProfile)) then
-        return nil, "BACKUP_BINDING_INVALID"
+    if sourceProfile ~= nil then
+        if not value.core or not validation.Rebind(value.core, sourceProfile, destinationProfile) then
+            return nil, "BACKUP_BINDING_INVALID"
+        end
+        local reboundOK, reboundValid = pcall(validate, value)
+        if not reboundOK or not reboundValid then return nil, "BACKUP_INVALID" end
     end
-    local canonical, err = encode(value)
-    if not canonical then return nil, err end
+    local snapshot = validation.Clone(value)
+    if not snapshot then return nil, "BACKUP_LIMIT" end
     local plan = { scope = value.scope, sourceProfile = sourceProfile, destinationProfile = destinationProfile }
-    plans[plan] = canonical
+    plans[plan] = snapshot
     return plan
 end
 
@@ -194,17 +210,18 @@ local function safeRestore()
 end
 
 function backup.Stage(plan, confirmed)
-    local input = plans[plan]
-    if confirmed ~= true or not input then return false, "BACKUP_CONFIRM_REQUIRED" end
+    local value = plans[plan]
+    if confirmed ~= true or not value then return false, "BACKUP_CONFIRM_REQUIRED" end
     if not safeRestore() then return false, "BACKUP_BUSY" end
     local root = _G.TRP3_RPSpellbookDB
     if type(root) ~= "table" or root.backupControl ~= nil and type(root.backupControl) ~= "table" then
         return false, "BACKUP_INVALID"
     end
     if root.backupControl and root.backupControl.pending then return false, "BACKUP_PENDING" end
-    local checked, err = backup.Prepare(input)
-    if not checked then return false, err end
-    local recovery, recoveryError = backup.Export(checked.scope)
+    if value.npc and not npcAvailable() then return false, "BACKUP_NPC_UNAVAILABLE" end
+    local input, err = encode(value)
+    if not input then return false, err end
+    local recovery, recoveryError = backup.Export(value.scope)
     if not recovery then return false, recoveryError end
      
     root.backupControl = { pending = input, recovery = recovery }
@@ -297,7 +314,8 @@ function backup.ApplyStartup()
     if not safeRestore() then return false, "BACKUP_BUSY" end
     local plan, err = backup.Prepare(control.pending)
     if not plan then return false, err end
-    local value = addon.PortableTable.Decode(plans[plan]:sub(#PREFIX + 1), validation.Limits)
+    local value = plans[plan]
+    plans[plan] = nil
     if value.configuration and not preferences() then return deferStartup() end
      
     local recovery, recoveryError = backup.Export(value.scope)

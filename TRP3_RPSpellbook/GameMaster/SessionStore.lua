@@ -125,6 +125,8 @@ local function copySpell(spell)
         ownerKey = spell.ownerKey,
         range = spell.range,
         resource = spell.resource,
+        resources = type(spell.resources) == "table"
+            and { spell.resources[1], spell.resources[2], spell.resources[3] } or nil,
         revision = spell.revision,
         tags = copyTags(spell.tags),
     }

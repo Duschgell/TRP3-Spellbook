@@ -2,6 +2,9 @@ local _, addon = ...
 
 addon.DeflateGuard = {}
 
+local MAX_BLOCKS = 4096
+local fixedLiteralDecoder, fixedDistanceDecoder
+
 local lengthBases = {
     3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
     35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258,
@@ -106,6 +109,7 @@ local function decodeSymbol(reader, decoder)
 end
 
 local function fixedDecoders()
+    if fixedLiteralDecoder then return fixedLiteralDecoder, fixedDistanceDecoder end
     local literals = {}
     for symbol = 0, 287 do
         literals[symbol + 1] = symbol <= 143 and 8
@@ -113,7 +117,8 @@ local function fixedDecoders()
     end
     local distances = {}
     for symbol = 0, 31 do distances[symbol + 1] = 5 end
-    return buildDecoder(literals), buildDecoder(distances)
+    fixedLiteralDecoder, fixedDistanceDecoder = buildDecoder(literals), buildDecoder(distances)
+    return fixedLiteralDecoder, fixedDistanceDecoder
 end
 
 local function dynamicDecoders(reader)
@@ -221,7 +226,10 @@ function addon.DeflateGuard.MeasureZlib(data, maximum)
     local reader = createReader(data, 3)
     local output = 0
     local final = false
+    local blocks = 0
     while not final do
+        blocks = blocks + 1
+        if blocks > MAX_BLOCKS then return nil, "too_complex" end
         local finalBit = reader.read(1)
         local blockType = reader.read(2)
         if finalBit == nil or blockType == nil or blockType == 3 then

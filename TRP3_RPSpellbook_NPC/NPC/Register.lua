@@ -55,7 +55,7 @@ local function cleanProfile(value)
     return result
 end
 
-local fields = { "name", "icon", "nameColor", "description", "resource", "range", "castTime", "cooldown", "effects", "tags" }
+local fields = { "name", "icon", "nameColor", "description", "resource", "resources", "range", "castTime", "cooldown", "effects", "tags" }
 local function cleanSpell(value)
     if type(value) ~= "table" then return nil end
     local candidate = {}
@@ -71,6 +71,17 @@ local function cleanSpell(value)
                     if type(entry) == "string" and not plain(entry, 300) then return nil end
                     candidate.effects[key] = entry
                 end
+            end
+        elseif field == "resources" then
+            if item ~= nil then
+                if type(item) ~= "table" then return nil end
+                local scanned = 0
+                for _, entry in pairs(item) do
+                    scanned = scanned + 1
+                    if scanned > addon.Validators.Limits.MAX_RESOURCES_PER_SPELL
+                        or not plain(entry, addon.Validators.Limits.MAX_SHORT_FIELD_LENGTH) then return nil end
+                end
+                candidate.resources = item
             end
         elseif field == "tags" then
             if item ~= nil then
@@ -324,6 +335,7 @@ function storage.UpdateSpell(spellID, patch)
         candidate[key] = patch[key]
         if candidate[key] == nil and (key == "name" or not patch.clearOptionalFields) then candidate[key] = spell[key] end
     end
+    candidate.resources = addon.Validators.GetPatchedResources(spell, patch)
     local cleaned = cleanSpell(candidate)
     if not cleaned then return nil, errorText("INVALID") end
     for _, key in ipairs(fields) do spell[key] = cleaned[key] end

@@ -114,6 +114,11 @@ local function normalizeSpell(spell, spellID, timestamp)
         end
     end
     normalizeTags(spell)
+    if spell.resources ~= nil then
+        local valid, cleaned = addon.Validators.ValidateSpell({ name = "Resource", resources = spell.resources })
+        spell.resources = valid and cleaned.resources or nil
+        if valid then spell.resource = cleaned.resource end
+    end
     normalizeEffects(spell)
     if addon.SpellCreationPresets and addon.SpellCreationPresets.NormalizeSpell then
         addon.SpellCreationPresets.NormalizeSpell(spell)

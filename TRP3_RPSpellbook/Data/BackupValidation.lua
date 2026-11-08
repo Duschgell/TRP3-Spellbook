@@ -27,11 +27,11 @@ local function array(value)
 end
 validation.Array = array
 
-local function retained(original, normalized, field)
+local function retained(original, normalized, field, strict)
     if type(original) ~= "table" then
         if original == normalized then return true end
         local presets = addon.SpellCreationPresets
-        if type(original) == "string" and type(normalized) == "string"
+        if not strict and type(original) == "string" and type(normalized) == "string"
             and presets and presets.NormalizeField then
             field = field == "Magieart" and "magicType" or field == "Magieschule" and "magicSchool" or field
             return presets.NormalizeField(field, original) == normalized
@@ -40,9 +40,17 @@ local function retained(original, normalized, field)
     end
     if type(normalized) ~= "table" then return false end
     for key, value in pairs(original) do
-        if not retained(value, normalized[key], key) then return false end
+        if not retained(value, normalized[key], field == "resources" and "resource" or key, strict) then return false end
     end
     return true
+end
+
+function validation.Settings(value)
+    if type(value) ~= "table" then return false end
+    local normalized = validation.Clone({ schemaVersion = addon.Constants.DATABASE_SCHEMA_VERSION, settings = value })
+    if not normalized then return false end
+    local ok, success = pcall(addon.Schema.InitializeDatabase, normalized)
+    return ok and success == true and retained(value, normalized.settings, nil, true)
 end
 
 function validation.Book(book, profileKey, npc)
@@ -196,4 +204,244 @@ function validation.Rebind(root, source, destination)
     end
      
     return true
+end
+
+do
+    local packing = {}
+    addon.BackupPacking = packing
+
+    local metadata = { id = true, ownerKey = true, createdAt = true, updatedAt = true, revision = true }
+    local limitKeys = { "MAX_BYTES", "MAX_ENTRIES", "MAX_DEPTH", "MAX_STRING" }
+
+    local function finite(value)
+        return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+    end
+
+    local function limitsFor(options)
+        if options ~= nil and (type(options) ~= "table" or getmetatable(options)) then error("limits") end
+        local limits = {}
+        for _, key in ipairs(limitKeys) do
+            local value = options and options[key]
+            if value == nil then value = addon.PortableTable[key] end
+            if not finite(value) or value < 1 or value % 1 ~= 0 then error("limits") end
+            limits[key] = value
+        end
+        return limits
+    end
+
+    local function envelopeLimits(limits)
+        return {
+            MAX_BYTES = limits.MAX_BYTES,
+            MAX_ENTRIES = limits.MAX_ENTRIES + 4,
+            MAX_DEPTH = limits.MAX_DEPTH + 4,
+            MAX_STRING = math.max(limits.MAX_STRING, 10),
+        }
+    end
+
+    local function spell(value)
+        return type(value) == "table" and type(value.name) == "string" and value.icon ~= nil
+            and (value.tags == nil or type(value.tags) == "table")
+            and (value.effects == nil or type(value.effects) == "table")
+            and (value.tags ~= nil or value.effects ~= nil)
+    end
+
+    local function keySize(key)
+        if type(key) == "string" then return 2 + #tostring(#key) + 2 * #key end
+        return 2 + #string.format("%.17g", key)
+    end
+
+    local function pathStep(cost, depth, key)
+        return cost + keySize(key) + keySize(depth)
+    end
+
+    local function measure(value, limits, targets)
+        local bytes, entries, active = 0, 0, {}
+        local function add(size)
+            bytes = bytes + size
+            if bytes > limits.MAX_BYTES then error("bytes") end
+        end
+        local function visit(item, depth)
+            if depth > limits.MAX_DEPTH then error("depth") end
+            local kind = type(item)
+            if kind == "string" then
+                if #item > limits.MAX_STRING then error("string") end
+                add(2 + #tostring(#item) + 2 * #item)
+            elseif kind == "number" then
+                if not finite(item) then error("number") end
+                add(2 + #string.format("%.17g", item))
+            elseif kind == "boolean" then
+                add(2)
+            elseif kind == "table" then
+                if getmetatable(item) or active[item] then error("table") end
+                active[item] = true
+                local content = targets and targets[item]
+                local count = 0
+                local function fields(source, countOnly)
+                    for key, child in pairs(source) do
+                        if type(key) ~= "string" and not finite(key) then error("key") end
+                        if countOnly then
+                            count, entries = count + 1, entries + 1
+                            if entries > limits.MAX_ENTRIES then error("entries") end
+                        else
+                            visit(key, depth + 1)
+                            visit(child, depth + 1)
+                        end
+                    end
+                end
+                fields(item, true)
+                if content then fields(content, true) end
+                add(2 + #tostring(count))
+                fields(item, false)
+                if content then fields(content, false) end
+                active[item] = nil
+            else
+                error("type")
+            end
+        end
+        visit(value, 0)
+    end
+
+    local function clone(value, targets)
+        if type(value) ~= "table" then return value end
+        local result = {}
+        for key, child in pairs(value) do result[key] = clone(child, targets) end
+        local content = targets and targets[value]
+        if content then
+            for key, child in pairs(content) do result[key] = clone(child, targets) end
+        end
+        return result
+    end
+
+    local function encode(value, options)
+        local limits = limitsFor(options)
+        measure(value, limits)
+        local byEncoding, candidates = {}, {}
+        local function collect(item, depth, pathCost)
+            if type(item) ~= "table" then return end
+            if spell(item) then
+                local content = {}
+                for key, child in pairs(item) do
+                    if not metadata[key] then content[key] = child end
+                end
+                local encoded = assert(addon.PortableTable.Encode(content, limits))
+                local candidate = byEncoding[encoded]
+                if not candidate then
+                    candidate = { content = content, count = 0, size = #encoded }
+                    byEncoding[encoded] = candidate
+                end
+                if pathCost + 2 + #tostring(depth) <= candidate.size then
+                    candidate.count = candidate.count + 1
+                end
+                candidates[item] = candidate
+            else
+                for key, child in pairs(item) do collect(child, depth + 1, pathStep(pathCost, depth + 1, key)) end
+            end
+        end
+        collect(value, 0, 0)
+        local pool, references, path = {}, {}, {}
+        local function skeleton(item, depth, pathCost)
+            if type(item) ~= "table" then return item end
+            local candidate = candidates[item]
+            local pooled = candidate and candidate.count > 1
+                and pathCost + 2 + #tostring(depth) <= candidate.size
+            if candidate and not pooled then return clone(item) end
+            if pooled then
+                if not candidate.index then
+                    pool[#pool + 1] = candidate.content
+                    candidate.index = #pool
+                end
+                local targetPath = {}
+                for index, key in ipairs(path) do targetPath[index] = key end
+                references[#references + 1] = { path = targetPath, index = candidate.index }
+            end
+            local result = {}
+            for key, child in pairs(item) do
+                if not pooled or metadata[key] then
+                    path[#path + 1] = key
+                    if pooled then
+                        result[key] = clone(child)
+                    else
+                        result[key] = skeleton(child, depth + 1, pathStep(pathCost, depth + 1, key))
+                    end
+                    path[#path] = nil
+                end
+            end
+            return result
+        end
+        local data = skeleton(value, 0, 0)
+        return assert(addon.PortableTable.Encode({ version = 1, data = data, spells = pool,
+            references = references }, envelopeLimits(limits)))
+    end
+
+    local function shape(value, allowed)
+        if type(value) ~= "table" then error("shape") end
+        for key in pairs(value) do if not allowed[key] then error("field") end end
+        for key in pairs(allowed) do if value[key] == nil then error("field") end end
+    end
+
+    local function dense(value)
+        if type(value) ~= "table" then error("array") end
+        local count = 0
+        for key in pairs(value) do
+            if not finite(key) or key < 1 or key % 1 ~= 0 then error("array") end
+            count = count + 1
+        end
+        for key in pairs(value) do if key > count then error("array") end end
+        return count
+    end
+
+    local function decode(payload, options)
+        local limits = limitsFor(options)
+        local envelope = assert(addon.PortableTable.Decode(payload, envelopeLimits(limits)))
+        shape(envelope, { version = true, data = true, spells = true, references = true })
+        if envelope.version ~= 1 then error("version") end
+        local pool, references = envelope.spells, envelope.references
+        local poolSize, referenceCount = dense(pool), dense(references)
+        for _, content in ipairs(pool) do
+            if not spell(content) then error("spell") end
+            for key in pairs(content) do if metadata[key] then error("metadata") end end
+        end
+        local targets, used = {}, {}
+        local function resolve(path, size, checkAncestors)
+            local item = envelope.data
+            for index = 1, size do
+                if type(item) ~= "table" or checkAncestors and targets[item] then error("path") end
+                item = item[path[index]]
+            end
+            if type(item) ~= "table" then error("target") end
+            return item
+        end
+        for index = 1, referenceCount do
+            local reference = references[index]
+            shape(reference, { path = true, index = true })
+            local size, poolID = dense(reference.path), reference.index
+            if size > limits.MAX_DEPTH or not finite(poolID) or poolID % 1 ~= 0
+                or poolID < 1 or poolID > poolSize then error("reference") end
+            for _, key in ipairs(reference.path) do
+                if type(key) ~= "string" and not finite(key) then error("path") end
+            end
+            local target = resolve(reference.path, size)
+            if targets[target] then error("duplicate") end
+            for key in pairs(target) do if not metadata[key] then error("overlap") end end
+            targets[target], used[poolID] = pool[poolID], true
+        end
+        for index = 1, poolSize do if not used[index] then error("unused") end end
+        for _, reference in ipairs(references) do resolve(reference.path, #reference.path, true) end
+        measure(envelope.data, limits, targets)
+        return clone(envelope.data, targets)
+    end
+
+    local function protected(callback, value, limits)
+        local ok, result = pcall(callback, value, limits)
+        if not ok then return nil, "TRANSFER_INVALID" end
+        return result
+    end
+
+    function packing.Encode(value, limits)
+        return protected(encode, value, limits)
+    end
+
+    function packing.Decode(payload, limits)
+        return protected(decode, payload, limits)
+    end
 end
