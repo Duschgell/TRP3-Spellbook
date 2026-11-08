@@ -173,6 +173,13 @@ local function addSpellFields(fields, spell)
             fields[#fields + 1] = effects.debuffType or ""
         end
     end
+    if addon.Constants.EXPORT_FORMAT_VERSION >= 6 then
+        local resources = spell.resources
+        fields[#fields + 1] = tostring(resources and #resources - 1 or 0)
+        for index = 2, resources and #resources or 1 do
+            fields[#fields + 1] = resources[index]
+        end
+    end
 end
 
 local function prepareSpell(sourceSpell)

@@ -2,7 +2,7 @@ local addonName, addon = ...
 
 addon.Constants = {
     ADDON_NAME = addonName,
-    ADDON_VERSION = "1.2.0",
+    ADDON_VERSION = "1.2.1",
     DATABASE_SCHEMA_VERSION = 12,
     DEFAULT_BOOK_ICON = "Interface\\Icons\\INV_Misc_Book_07",
     DEFAULT_BOOK_NAME = "Spellbook",
@@ -43,7 +43,7 @@ addon.Constants = {
     COMPACT_EXPORT_FORMAT_PREFIX = "TRP3RSB",
     COMPACT_EXPORT_CODEC_VERSION = 1,
     MIN_EXPORT_FORMAT_VERSION = 1,
-    EXPORT_FORMAT_VERSION = 5,
+    EXPORT_FORMAT_VERSION = 6,
      
     EFFECT_DURATION_PERMANENT = 0,
     EFFECT_DURATION_INFINITY = "\226\136\158",

@@ -20,7 +20,9 @@ end
 
 local function buildSearchData(spell)
     local metadata = {}
-    append(metadata, spell.resource)
+    for _, value in ipairs(type(spell.resources) == "table" and spell.resources or { spell.resource }) do
+        append(metadata, value)
+    end
     append(metadata, spell.range)
     append(metadata, spell.castTime)
     append(metadata, spell.cooldown)

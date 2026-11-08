@@ -393,6 +393,12 @@ function addon.SpellCreationPresets.NormalizeSpell(spell)
     for _, field in ipairs({ "resource", "range", "castTime", "cooldown" }) do
         spell[field] = normalize(field, spell[field])
     end
+    if type(spell.resources) == "table" then
+        for index, entry in ipairs(spell.resources) do
+            spell.resources[index] = normalize("resource", entry)
+        end
+        spell.resource = spell.resources[1]
+    end
     if type(spell.tags) == "table" then
         for key, field in pairs({ [addon.Constants.MAGIC_TAG_TYPE] = "magicType",
             [addon.Constants.MAGIC_TAG_SCHOOL] = "magicSchool",

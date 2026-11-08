@@ -40,7 +40,7 @@ local function retained(original, normalized, field, strict)
     end
     if type(normalized) ~= "table" then return false end
     for key, value in pairs(original) do
-        if not retained(value, normalized[key], key, strict) then return false end
+        if not retained(value, normalized[key], field == "resources" and "resource" or key, strict) then return false end
     end
     return true
 end

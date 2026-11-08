@@ -201,6 +201,12 @@ function addon.ChatLinks.ValidateTooltipSpell(spell)
 
     cleanedSpell.name = addon.ChatLinks.SanitizeDisplayName(cleanedSpell.name)
     cleanedSpell.resource = sanitizeSnapshotText(cleanedSpell.resource)
+    if cleanedSpell.resources then
+        for index, value in ipairs(cleanedSpell.resources) do
+            cleanedSpell.resources[index] = sanitizeSnapshotText(value)
+        end
+        cleanedSpell.resource = cleanedSpell.resources[1]
+    end
     cleanedSpell.range = sanitizeSnapshotText(cleanedSpell.range)
     cleanedSpell.castTime = sanitizeSnapshotText(cleanedSpell.castTime)
     cleanedSpell.cooldown = sanitizeSnapshotText(cleanedSpell.cooldown)

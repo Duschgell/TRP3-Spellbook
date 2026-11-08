@@ -219,6 +219,10 @@ local function buildVirtualBook(group)
                         effects[effectKey] = effectValue
                     end
                     virtualSpell.effects = effects
+                elseif key == "resources" and type(value) == "table" then
+                    local resources = {}
+                    for index, resource in ipairs(value) do resources[index] = resource end
+                    virtualSpell.resources = resources
                 else
                     virtualSpell[key] = value
                 end

@@ -55,12 +55,13 @@ function addon.SpellTooltip.Show(owner, spell, canEdit, anchor, options)
         GameTooltip:AddLine(text(magicSummary), 0.65, 0.72, 0.82)
     end
 
-    local hasResource = type(spell.resource) == "string" and spell.resource ~= ""
+    local resources = addon.SpellPresentation.GetResourceLines(spell)
     local hasRange = type(spell.range) == "string" and spell.range ~= ""
-    if hasResource or hasRange then
-        GameTooltip:AddDoubleLine(hasResource and text(spell.resource) or "",
+    if #resources > 0 or hasRange then
+        GameTooltip:AddDoubleLine(text(resources[1] or ""),
             hasRange and (addon.L("FIELD_RANGE") .. ": " .. text(spell.range)) or "", 1, 1, 1, 1, 1, 1)
     end
+    for index = 2, #resources do GameTooltip:AddLine(text(resources[index]), 1, 1, 1, true) end
     local castTime, cooldown = addon.SpellPresentation.GetTooltipTiming(spell)
     if castTime or cooldown then
          

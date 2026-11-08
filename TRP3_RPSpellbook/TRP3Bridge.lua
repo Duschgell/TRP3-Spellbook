@@ -907,16 +907,17 @@ local function buildSpellChatTooltip(api, snapshot)
         tooltipLines:AddLine(magicSummary, getTooltipColor(api, "A6B8D1", white))
     end
 
-    local hasResource = type(spell.resource) == "string" and spell.resource ~= ""
+    local resources = addon.SpellPresentation.GetResourceLines(spell)
     local hasRange = type(spell.range) == "string" and spell.range ~= ""
-    if hasResource or hasRange then
+    if #resources > 0 or hasRange then
         tooltipLines:AddDoubleLine(
-            hasResource and spell.resource or "",
+            resources[1] or "",
             hasRange and (addon.L("FIELD_RANGE") .. ": " .. spell.range) or "",
             white,
             white
         )
     end
+    for index = 2, #resources do tooltipLines:AddLine(resources[index], white) end
     local castTime, cooldown = addon.SpellPresentation.GetTooltipTiming(spell)
     if castTime or cooldown then
         tooltipLines:AddDoubleLine(castTime or " ", cooldown or "", white, white)

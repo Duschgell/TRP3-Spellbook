@@ -683,6 +683,7 @@ function addon.Database.UpdateSpell(spellID, patch)
         icon = getPatchedValue(spell.icon, patch, "icon", clearOptionalFields),
         nameColor = getPatchedValue(spell.nameColor, patch, "nameColor", clearOptionalFields),
         resource = getPatchedValue(spell.resource, patch, "resource", clearOptionalFields),
+        resources = addon.Validators.GetPatchedResources(spell, patch),
         range = getPatchedValue(spell.range, patch, "range", clearOptionalFields),
         castTime = getPatchedValue(spell.castTime, patch, "castTime", clearOptionalFields),
         cooldown = getPatchedValue(spell.cooldown, patch, "cooldown", clearOptionalFields),

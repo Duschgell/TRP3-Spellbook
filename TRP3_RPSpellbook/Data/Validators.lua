@@ -7,6 +7,7 @@ addon.Validators.Limits = {
     MAX_EFFECT_MESSAGE_LENGTH = 300,
     MAX_ICON_LENGTH = 255,
     MAX_SHORT_FIELD_LENGTH = 80,
+    MAX_RESOURCES_PER_SPELL = 3,
     MAX_SPELL_NAME_LENGTH = 80,
     MAX_TAB_NAME_LENGTH = 40,
     MAX_TAG_KEY_LENGTH = 40,
@@ -85,6 +86,57 @@ local function cleanOptionalString(value, maximumLength, errors, fieldName)
 
     return cleaned
 end
+local function cleanResources(value, errors)
+    if value == nil then return nil end
+    local limits = addon.Validators.Limits
+    if type(value) ~= "table" then
+        addError(errors, addon.L("INVALID_ABILITY"))
+        return nil
+    end
+    local cleaned, count = {}, 0
+    for key, entry in pairs(value) do
+        if type(key) ~= "number" or key < 1 or key > limits.MAX_RESOURCES_PER_SPELL
+            or key ~= math.floor(key) or type(entry) ~= "string" or trim(entry) == ""
+        then
+            addError(errors, addon.L("INVALID_ABILITY"))
+            return nil
+        end
+        if #entry > limits.MAX_SHORT_FIELD_LENGTH then
+            addError(errors, addon.L("FIELD_TOO_LONG", addon.L("FIELD_RESOURCE")))
+            return nil
+        end
+        count = count + 1
+        cleaned[key] = trim(entry)
+    end
+    if count == 0 then
+        addError(errors, addon.L("INVALID_ABILITY"))
+        return nil
+    end
+    for index = 1, count do
+        if cleaned[index] == nil then
+            addError(errors, addon.L("INVALID_ABILITY"))
+            return nil
+        end
+    end
+    return cleaned
+end
+
+function addon.Validators.GetPatchedResources(spell, patch)
+    if patch.resources ~= nil then return patch.resources end
+    if patch.clearOptionalFields == true then return nil end
+    if spell.resources == nil then return nil end
+    local resources = {}
+    for index, entry in ipairs(spell.resources) do resources[index] = entry end
+    if patch.resource ~= nil then
+        if type(patch.resource) == "string" and trim(patch.resource) == "" then
+            table.remove(resources, 1)
+        else
+            resources[1] = patch.resource
+        end
+    end
+    return next(resources) and resources or nil
+end
+
 local function cleanDuration(value, minimum, maximum, errors)
     if value == nil then return nil end
     local number = tonumber(value)
@@ -285,6 +337,7 @@ function addon.Validators.ValidateSpell(data)
     end
 
     local limits = addon.Validators.Limits
+    local resources = cleanResources(data.resources, errors)
     local cleaned = {
         name = cleanRequiredString(
             data.name,
@@ -295,7 +348,9 @@ function addon.Validators.ValidateSpell(data)
         ),
         icon = cleanIcon(data.icon, errors),
         nameColor = cleanColor(data.nameColor, errors),
-        resource = cleanOptionalString(data.resource, limits.MAX_SHORT_FIELD_LENGTH, errors, addon.L("FIELD_RESOURCE")),
+        resource = resources and resources[1] or (data.resources == nil
+            and cleanOptionalString(data.resource, limits.MAX_SHORT_FIELD_LENGTH, errors, addon.L("FIELD_RESOURCE")) or nil),
+        resources = resources,
         range = cleanOptionalString(data.range, limits.MAX_SHORT_FIELD_LENGTH, errors, addon.L("FIELD_RANGE")),
         castTime = cleanOptionalString(data.castTime, limits.MAX_SHORT_FIELD_LENGTH, errors, addon.L("FIELD_CAST_TIME")),
         cooldown = cleanOptionalString(data.cooldown, limits.MAX_SHORT_FIELD_LENGTH, errors, addon.L("FIELD_COOLDOWN")),
@@ -306,6 +361,14 @@ function addon.Validators.ValidateSpell(data)
 
     if addon.SpellCreationPresets and addon.SpellCreationPresets.NormalizeSpell then
         addon.SpellCreationPresets.NormalizeSpell(cleaned)
+    end
+    if cleaned.resources then
+        for _, entry in ipairs(cleaned.resources) do
+            if #entry > limits.MAX_SHORT_FIELD_LENGTH then
+                addError(errors, addon.L("FIELD_TOO_LONG", addon.L("FIELD_RESOURCE")))
+            end
+        end
+        if #cleaned.resources == 1 then cleaned.resources = nil end
     end
 
     return #errors == 0, cleaned, errors

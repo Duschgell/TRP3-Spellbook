@@ -182,7 +182,8 @@ local function buildSpellSections(spell)
     sections[#sections + 1] = table.concat(classificationParts, "; ")
 
     local metadata = {}
-    appendField(metadata, addon.L("FIELD_RESOURCE"), spell.resource)
+    appendField(metadata, addon.L("FIELD_RESOURCE"),
+        table.concat(addon.SpellPresentation.GetResourceLines(spell), ", "))
     appendField(metadata, addon.L("FIELD_RANGE"), spell.range)
     appendField(metadata, addon.L("FIELD_CAST_TIME"), spell.castTime)
     if addon.SpellPresentation.ShouldShowCooldown(spell.cooldown) then
