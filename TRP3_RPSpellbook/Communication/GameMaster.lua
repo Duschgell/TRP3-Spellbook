@@ -53,7 +53,7 @@ local function createVisibilityTransferID()
         visibilityTransferSerial = 1
     end
     return string.format(
-        "v-%d-%d",
+        "v-%.0f-%d",
         math.floor(addon.Runtime.GetMonotonicTime() * 1000),
         visibilityTransferSerial
     )

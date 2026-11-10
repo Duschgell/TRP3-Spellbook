@@ -125,7 +125,7 @@ local function createMessageID()
         messageSerial = 1
     end
     return string.format(
-        "%d-%d",
+        "%.0f-%d",
         math.floor(addon.Runtime.GetMonotonicTime() * 1000),
         messageSerial
     )
