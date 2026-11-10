@@ -2,6 +2,11 @@ local _, addon = ...
 
 addon.ReleaseNotes = {}
 local releases = {
+    ["1.2.2"] = {
+        enUS = "- Hotfix: Fixed an issue where message IDs could cause an integer overflow",
+        deDE = "- Hotfix: Einen Fehler behoben, wo Nachrichten-IDs zu einem Integer overflow führen konnten",
+        frFR = "- Hotfix : Correction d'un problème où les identifiants de message pouvaient provoquer un dépassement d'entier",
+    },
     ["1.2.1"] = {
         enUS = "- The option to specify up to 3 different resources per spell",
         deDE = "- Die Möglichkeit, bis zu 3 unterschiedliche Ressourcen pro Zauber anzugeben",

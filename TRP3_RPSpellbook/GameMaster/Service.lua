@@ -277,7 +277,7 @@ local function createActivationID()
         activationSerial = 1
     end
     return string.format(
-        "activation_%d_%d",
+        "activation_%.0f_%d",
         math.floor(addon.Runtime.GetMonotonicTime() * 1000),
         activationSerial
     )
