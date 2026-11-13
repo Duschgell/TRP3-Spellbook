@@ -10,6 +10,11 @@ local worldEntry, worldHandled
 local LINK_PREFIX = "addon:rpspellbook:version:"
 local previewOwner
 local installedScheduled
+local HISTORY_REQUEST, HISTORY_RESPONSE = "release_history_request", "release_history_response"
+local HISTORY_TIMEOUT = 30
+local HISTORY_MAX_PEERS = 5
+local pendingHistory, historySerial, nextHistoryReply = nil, 0, 0
+local historyReplies = addon.Cache.NewBounded(constants.COMMUNICATION_MAX_PEERS)
 
 local function parse(value)
     if type(value) ~= "string" or #value > constants.VERSION_CHECK_MAX_VERSION_BYTES then return end
@@ -90,7 +95,38 @@ local function rememberNotice(candidate)
     settings.versionCheckNotes = retained
 end
 
-local function showNotes(version, notes)
+local function updateNotesText(version, notes, history, resetScroll)
+    local sections = {}
+    for _, entry in ipairs(history or {}) do
+        local text = addon.ReleaseNotes.GetText(entry.notes)
+        if text then sections[#sections + 1] = "|cffffd100v" .. entry.version .. "|r\n" .. text end
+    end
+    dialog.version = version
+    dialog.title:SetText(addon.L("UPDATE_NOTES_TITLE", version))
+    if #sections == 0 then sections[1] = addon.ReleaseNotes.GetText(notes) or addon.L("UPDATE_NOTES_EMPTY") end
+    local height = 0
+    for index, section in ipairs(sections) do
+        local label = dialog.sections[index]
+        if not label then
+            label = addon.UIFactory.CreateLabel(dialog.content, addon.Theme.Fonts.body, "", addon.Theme.Colors.text)
+            label:SetWidth(420)
+            label:SetJustifyH("LEFT")
+            label:SetJustifyV("TOP")
+            label:SetWordWrap(true)
+            dialog.sections[index] = label
+        end
+        label:ClearAllPoints()
+        label:SetPoint("TOPLEFT", dialog.content, "TOPLEFT", 0, -height)
+        label:SetText(section .. (index < #sections and "\n\n|cff80705a----------------|r\n " or ""))
+        label:Show()
+        height = height + label:GetStringHeight()
+    end
+    for index = #sections + 1, #dialog.sections do dialog.sections[index]:Hide() end
+    dialog.content:SetHeight(math.max(1, height))
+    if resetScroll then dialog.scroll:SetVerticalScroll(0) end
+end
+
+local function showNotes(version, notes, history)
     if not dialog then
         local factory, theme = addon.UIFactory, addon.Theme
         dialog = factory.CreateDialog("", 480, 340)
@@ -120,14 +156,117 @@ local function showNotes(version, notes)
         close:SetPoint("BOTTOMRIGHT", -20, 16)
         close:SetScript("OnClick", function() dialog:Hide() end)
         dialog.text, dialog.content, dialog.scroll = text, child, scroll
+        dialog.sections = { text }
     end
-    dialog.title:SetText(addon.L("UPDATE_NOTES_TITLE", version))
-    dialog.text:SetText(addon.ReleaseNotes.GetText(notes) or addon.L("UPDATE_NOTES_EMPTY"))
-    dialog.content:SetHeight(math.max(1, dialog.text:GetStringHeight()))
-    dialog.scroll:SetVerticalScroll(0)
+    updateNotesText(version, notes, history, true)
     dialog:Show()
     dialog.updateScrolling()
     addon.UIFactory.BringToFront(dialog)
+end
+
+local function requestHistory(version, entry)
+    local current, after = parse(constants.ADDON_VERSION)
+    local target = parse(version)
+    local count = requiredReports()
+    local notes = confirmedNotes(entry)
+    if not notes or (entry.historyConfirmations or 0) >= count or not higher(target, current) or count > HISTORY_MAX_PEERS then return end
+    local now = addon.Runtime.GetMonotonicTime()
+    if pendingHistory and now < pendingHistory.expires then return end
+    local recipients, waiting = {}, {}
+    for id, candidate in pairs(peers) do
+        local peer = addon.Communication.GetPeer(candidate.playerID)
+        local _, peerVersion = parse(peer and peer.addonVersion)
+        if peerVersion == version and addon.ReleaseNotes.Same(notes, peer.releaseNotes)
+            and addon.Communication.HasCapability(candidate.playerID, constants.VERSION_CHECK_HISTORY_CAPABILITY) then
+            recipients[#recipients + 1], waiting[id] = peer.playerID, true
+            if #recipients == count then break end
+        end
+    end
+    if #recipients < count then return end
+    historySerial = historySerial % 999999 + 1
+    local id = string.format("%.0f-%d", math.floor(now * 1000), historySerial)
+    pendingHistory = { id = id, version = version, entry = entry, after = after, waiting = waiting,
+        expires = now + HISTORY_TIMEOUT, required = count, matches = 0 }
+    for _, recipient in ipairs(recipients) do
+        addon.Communication.Send(recipient, HISTORY_REQUEST, { id = id, version = version, after = after }, "LOW")
+    end
+end
+
+local function handleHistoryRequest(payload, sender)
+    if type(payload) ~= "table" or not addon.Runtime.IsSafeIdentifier(payload.id, 64) then return end
+    local current, version = parse(constants.ADDON_VERSION)
+    local after, canonical = parse(payload.after)
+    if payload.version ~= version or canonical ~= payload.after or not higher(current, after)
+        or not addon.Communication.HasCapability(sender, constants.VERSION_CHECK_HISTORY_CAPABILITY) then return end
+    local key = addon.Runtime.NormalizePlayerID(sender)
+    local now = addon.Runtime.GetMonotonicTime()
+    if now < nextHistoryReply or now < (historyReplies:Get(key) or 0) then return end
+
+    local versions, seen = {}, {}
+    for _, name in ipairs(addon.ReleaseNotes.GetVersions()) do
+        local parts, normalized = parse(name)
+        if parts and not higher(parts, current) and not seen[normalized] then
+            versions[#versions + 1] = { name = name, version = normalized, parts = parts }
+            seen[normalized] = true
+        end
+    end
+    table.sort(versions, function(left, right) return higher(left.parts, right.parts) end)
+    local history = {}
+    for index = 1, math.min(#versions, constants.VERSION_CHECK_RELEASE_LIMIT) do
+        local release = versions[index]
+        if not higher(release.parts, after) then break end
+        local notes = addon.ReleaseNotes.Get(release.name)
+        if notes then history[#history + 1] = { version = release.version, notes = notes } end
+    end
+    if not history[1] or history[1].version ~= version then return end
+    nextHistoryReply = now + 2
+    historyReplies:Set(key, now + HISTORY_TIMEOUT)
+    addon.Communication.Send(sender, HISTORY_RESPONSE, { id = payload.id, history = history }, "LOW")
+end
+
+local function handleHistoryResponse(payload, sender)
+    local pending = pendingHistory
+    local _, key = addon.Runtime.NormalizeFullPlayerID(sender)
+    if not pending or pending.done or not pending.waiting[key] or type(payload) ~= "table" or payload.id ~= pending.id
+        or addon.Runtime.GetMonotonicTime() >= pending.expires or announced:Get(pending.version) ~= pending.entry then return end
+    local count = addon.Runtime.GetBoundedArrayLength(payload.history, constants.VERSION_CHECK_RELEASE_LIMIT)
+    if not count or count == 0 then return end
+
+    local previous, after = nil, parse(pending.after)
+    local history = {}
+    for index = 1, count do
+        local item = payload.history[index]
+        if type(item) ~= "table" then return end
+        local parts, version = parse(item.version)
+        local notes = addon.ReleaseNotes.Copy(item.notes)
+        if version ~= item.version or not higher(parts, after) or not notes
+            or (index == 1 and version ~= pending.version) or (previous and not higher(previous, parts)) then return end
+        previous = parts
+        history[index] = { version = version, notes = notes }
+    end
+    local latest = confirmedNotes(pending.entry)
+    if not latest or not addon.ReleaseNotes.Same(latest, history[1].notes) then return end
+    pending.waiting[key] = nil
+    if pending.history then
+        if #pending.history ~= #history then pending.done = true; return end
+        for index, item in ipairs(history) do
+            local other = pending.history[index]
+            if item.version ~= other.version or not addon.ReleaseNotes.Same(item.notes, other.notes) then
+                pending.done = true
+                return
+            end
+        end
+    else
+        pending.history = history
+    end
+    pending.matches = pending.matches + 1
+    if pending.matches < pending.required or pending.matches < requiredReports() then return end
+    pending.done = true
+    pending.entry.history, pending.entry.historyConfirmations = history, pending.matches
+    if dialog and dialog.version == pending.version and dialog:IsShown() then
+        updateNotesText(pending.version, latest, history, false)
+        dialog.updateScrolling()
+    end
 end
 
 function check.PreviewLink(owner, link)
@@ -157,7 +296,12 @@ function check.HandleLink(link, button)
     if button and button ~= "LeftButton" or IsModifiedClick and IsModifiedClick() then return true end
     local version = link:sub(#LINK_PREFIX + 1)
     local notes, known = linkNotes(version)
-    if known then showNotes(version, notes) end
+    if known then
+        local entry = version ~= check.GetCurrentVersion() and announced:Get(version) or nil
+        local history = notes and entry and (entry.historyConfirmations or 0) >= requiredReports() and entry.history
+        showNotes(version, notes, history or nil)
+        if entry then requestHistory(version, entry) end
+    end
     return true
 end
 
@@ -231,7 +375,7 @@ schedule = function()
 end
 
 local function onPeer(peer)
-    if sessionNotified and worldHandled or type(peer) ~= "table" then return end
+    if type(peer) ~= "table" then return end
     local _, id = addon.Runtime.NormalizeFullPlayerID(peer.playerID)
     local api = _G.TRP3_API
     local _, own = addon.Runtime.NormalizeFullPlayerID(api and api.globals and api.globals.player_id)
@@ -253,9 +397,9 @@ local function onPeer(peer)
         peerCount = peerCount + 1
     end
     local notes = addon.ReleaseNotes.Copy(peer.releaseNotes)
-    peers[id] = { parts = parts, version = version, seen = addon.Runtime.GetMonotonicTime(),
+    peers[id] = { playerID = peer.playerID, parts = parts, version = version, seen = addon.Runtime.GetMonotonicTime(),
         notes = notes, notesKey = addon.ReleaseNotes.Key(notes) }
-    if bestCandidate() then schedule() end
+    if not (sessionNotified and worldHandled) and bestCandidate() then schedule() end
 end
 
 local function applyWorldEntry()
@@ -317,6 +461,8 @@ function check.Initialize()
         end
     end
     addon.Communication.RegisterPeerListener(onPeer)
+    addon.Communication.RegisterHandler(HISTORY_REQUEST, handleHistoryRequest)
+    addon.Communication.RegisterHandler(HISTORY_RESPONSE, handleHistoryResponse)
     addon.SpellCreationSettings.RegisterListener(function() if bestCandidate() then schedule() end end)
     scheduleInstalled()
 end
