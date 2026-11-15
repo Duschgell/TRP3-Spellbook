@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import importlib.util
 import os
 import re
@@ -14,7 +15,6 @@ spec = importlib.util.spec_from_file_location(
     "addon_check", Path(__file__).with_name("addon_check.py"))
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
-
 
 def version(value):
     check.require(isinstance(value, str) and len(value) <= 24
@@ -44,31 +44,38 @@ def check_release_notes(root, current):
     print(result.stdout.strip())
 
 
-def build(root, output, release_tag=None):
+def build(root, output, release_tag=None, *, target="retail"):
     root = Path(root).absolute()
+    source = check.platform_root(root, target)
     output = Path(output).absolute()
     check.require(output.suffix == ".zip", "Output must be a .zip file")
     files = {}
     versions = {}
+    interfaces = set()
 
     for addon in check.ADDONS:
-        directory = check.exact(root, addon, "directory")
+        directory = check.exact(source, addon, "directory")
         check.require(not output.resolve().is_relative_to(directory.resolve()),
                       "Output must be outside addon directories")
         entries = check.inventory(directory)
         toc = addon + ".toc"
         check.require(toc in entries, f"Missing exact-name manifest: {addon}/{toc}")
+        check.require({name for name in entries if name.endswith(".toc")} == {toc},
+                      f"Unexpected additional manifest in {addon}")
         metadata, _ = check.manifest(entries[toc])
+        check.check_target_manifest(metadata, target, toc)
+        interfaces.add(metadata["interface"])
         versions[addon] = metadata["version"]
         files.update((f"{addon}/{name}", path) for name, path in entries.items())
 
     current = versions[check.CORE]
     check.require(len(set(versions.values())) == 1, "Addon package versions disagree")
+    check.require(len(interfaces) == 1, "Addon package interfaces disagree")
     if release_tag is not None:
         check.require(isinstance(release_tag, str), "Release tag must be text")
         check.require(version(release_tag.removeprefix("release/").removeprefix("v")) == version(current),
                       "Release tag and addon version disagree")
-    check_release_notes(root, current)
+    check_release_notes(source, current)
     handle = output.open("xb")
 
     try:
@@ -93,10 +100,14 @@ def build(root, output, release_tag=None):
 
 
 def main():
-    check.require(len(sys.argv) in (3, 4),
-                  "Usage: build_release.py REPOSITORY_ROOT OUTPUT.zip [RELEASE_TAG]")
-    count = build(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else None)
-    print(f"PASS: {count} files in three addon folders: {sys.argv[2]}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("root")
+    parser.add_argument("output")
+    parser.add_argument("release_tag", nargs="?")
+    parser.add_argument("--target", choices=check.TARGETS, default="retail")
+    args = parser.parse_args()
+    count = build(args.root, args.output, args.release_tag, target=args.target)
+    print(f"PASS: {args.target}, {count} files in three addon folders: {args.output}")
 
 
 if __name__ == "__main__":

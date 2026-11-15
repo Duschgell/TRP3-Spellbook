@@ -12,14 +12,15 @@ BASE = Path(__file__).resolve().parent
 ROOT = BASE.parents[1]
 TESTS = BASE / "tests"
 RUNNER = BASE / "runner.lua"
+TARGETS = {"retail": "Retail", "forever": "Forever"}
 
 
-def invoke(lua, test_file, probe="", timeout=10):
+def invoke(lua, test_file, probe="", timeout=10, *, platform="Retail"):
     with tempfile.TemporaryDirectory(prefix="spellbook-test-") as directory:
         report = Path(directory) / "completed"
         try:
             process = subprocess.run(
-                [lua, str(RUNNER), str(ROOT), str(test_file), str(report), probe],
+                [lua, str(RUNNER), str(ROOT), str(test_file), str(report), probe, platform],
                 cwd=ROOT,
                 env={
                     key: value
@@ -76,6 +77,9 @@ def invoke(lua, test_file, probe="", timeout=10):
 
 
 def main():
+    if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1] not in (*TARGETS, "both")):
+        raise RuntimeError("Usage: run_tests.py [retail|forever|both]")
+    targets = list(TARGETS) if len(sys.argv) == 1 or sys.argv[1] == "both" else sys.argv[1:]
     lua = shutil.which("lua5.1")
     if not lua:
         raise RuntimeError("Required executable not found: lua5.1")
@@ -100,19 +104,24 @@ def main():
                 f"Runner probe {probe}: expected {expected}, got {kind}\n{output}"
             )
 
+    results = [run_platform(lua, test_files, TARGETS[target]) for target in targets]
+    return int(any(results))
+
+
+def run_platform(lua, test_files, platform):
     failed, seen = False, set()
     for test_file in test_files:
-        kind, identifiers, output = invoke(lua, test_file)
+        kind, identifiers, output = invoke(lua, test_file, platform=platform)
         duplicates = seen.intersection(identifiers)
         if kind != "ok" or duplicates:
             failed = True
             print(
-                f"FAIL {test_file.relative_to(ROOT)}: {kind}; "
+                f"FAIL {platform}/{test_file.relative_to(ROOT)}: {kind}; "
                 f"duplicate IDs={sorted(duplicates)}\n{output}",
                 file=sys.stderr,
             )
         else:
-            print(f"{test_file.relative_to(ROOT)}: {len(identifiers)} cases completed")
+            print(f"{platform}/{test_file.relative_to(ROOT)}: {len(identifiers)} cases completed")
         seen.update(identifiers)
     return int(failed or not seen)
 

@@ -1,4 +1,5 @@
-local root = ...
+local root, platform = ...
+platform = platform or "Retail"
 local F = {}
 F.releaseCheck = assert(loadfile(root .. "/.tools/ci/check_release_notes.lua"))().Validate
 
@@ -119,7 +120,7 @@ function F.fresh(area)
 
         local entry = modules[key]
         local chunk = assert(loadfile(
-            root .. "/TRP3_RPSpellbook/" .. entry[1]))
+            root .. "/" .. platform .. "/TRP3_RPSpellbook/" .. entry[1]))
 
         setfenv(chunk, env)("TRP3_RPSpellbook", addon)
 

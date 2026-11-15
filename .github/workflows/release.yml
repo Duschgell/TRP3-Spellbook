@@ -28,7 +28,12 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify release comes from main
+        shell: bash
+        run: git merge-base --is-ancestor HEAD refs/remotes/origin/main
 
       - name: Prepare release notes check
         shell: bash
@@ -37,19 +42,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y lua5.1
 
-      - name: Build and verify ZIP
+      - name: Build and verify Retail and Forever ZIPs
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        shell: bash
-        run: python3 -I -B .tools/ci/build_release.py . "$RUNNER_TEMP/TRP3_Spellbook.zip" "$RELEASE_TAG"
-
-      - name: Attach ZIP and license to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          RELEASE_ZIP: ${{ runner.temp }}/TRP3_Spellbook.zip
         shell: bash
         run: |
           set -euo pipefail
-          gh release upload --repo "$GITHUB_REPOSITORY" -- \
-            "$RELEASE_TAG" "$RELEASE_ZIP" "$GITHUB_WORKSPACE/LICENSE"
+          python3 -I -B .tools/ci/build_release.py . "$RUNNER_TEMP/TRP3_Spellbook-Retail.zip" "$RELEASE_TAG" --target retail
+          python3 -I -B .tools/ci/build_release.py . "$RUNNER_TEMP/TRP3_Spellbook-Forever.zip" "$RELEASE_TAG" --target forever
+
+      - name: Attach both ZIPs and license to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing_assets="$(gh release view --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[] | [.name, .state] | @tsv' -- "$RELEASE_TAG")"
+          missing=()
+          for file in "$RUNNER_TEMP/TRP3_Spellbook-Retail.zip" \
+            "$RUNNER_TEMP/TRP3_Spellbook-Forever.zip" "$GITHUB_WORKSPACE/LICENSE"; do
+            name="${file##*/}"
+            while IFS=$'\t' read -r asset state; do
+              if [[ "$asset" != "$name" ]]; then
+                continue
+              fi
+              if [[ "$state" != "uploaded" ]]; then
+                printf 'Release asset %s is incomplete (%s). Remove it before retrying.\n' "$name" "$state" >&2
+                exit 1
+              fi
+              printf 'Skipping previously uploaded asset: %s\n' "$name"
+              continue 2
+            done <<< "$existing_assets"
+            missing+=("$file")
+          done
+          if (( ${#missing[@]} > 0 )); then
+            gh release upload --repo "$GITHUB_REPOSITORY" -- "$RELEASE_TAG" "${missing[@]}"
+          fi

@@ -11,6 +11,10 @@ from xml.etree import ElementTree as ET
 
 CORE = "TRP3_RPSpellbook"
 ADDONS = (CORE, CORE + "_GameMaster", CORE + "_NPC")
+TARGETS = {
+    "retail": ("Retail", r"12[0-9]{4}", "standard", "camelot, classic"),
+    "forever": ("Forever", r"16001", "camelot", "standard, classic"),
+}
 EXTERNAL = {"totalRP3", "totalRP3_Extended", "totalRP3_KuiNameplates"}
 REQUIRED = {CORE: {"totalRP3"}, ADDONS[1]: {CORE}, ADDONS[2]: {CORE}}
 LIFECYCLE = {
@@ -189,19 +193,32 @@ def run(root, *command):
 
 
 
-def main():
-    require(len(sys.argv) == 2, "Usage: addon_check.py REPOSITORY_ROOT")
-    root = Path(os.path.abspath(sys.argv[1]))
-    require(kind(root) == "directory", "Repository root must be a directory")
-    license_path = exact(root, "LICENSE", "file")
-    require(license_path.read_bytes().strip(), "Empty LICENSE")
+def platform_root(root, target):
+    require(target in TARGETS, f"Unsupported build target: {target}")
+    return exact(root, TARGETS[target][0], "directory")
+
+
+def check_target_manifest(metadata, target, name):
+    _, interface, allowed, excluded = TARGETS[target]
+    require(re.fullmatch(interface, metadata["interface"]),
+            f"Unexpected {target} interface: {name}")
+    require(metadata.get("allowloadgametype") == allowed
+            and metadata.get("excludeloadgametype") == excluded,
+            f"Unexpected game type restrictions: {name}")
+
+
+def validate_tree(source, target):
     package, lua_files, xml_files, graph = set(), [], [], {}
+    versions, interfaces = set(), set()
     for addon in ADDONS:
-        directory = exact(root, addon, "directory")
+        directory = exact(source, addon, "directory")
         files = inventory(directory)
         toc = addon + ".toc"
         require(toc in files, f"Missing exact-name manifest: {addon}/{toc}")
         metadata, entries = manifest(files[toc])
+        check_target_manifest(metadata, target, toc)
+        versions.add(metadata["version"])
+        interfaces.add(metadata["interface"])
 
         require("requireddeps" not in metadata or "dependencies" not in metadata,
                 f"Ambiguous RequiredDeps/Dependencies: {addon}")
@@ -310,6 +327,21 @@ def main():
 
     for addon in ADDONS:
         visit(addon)
+    require(len(versions) == 1, f"Addon package versions disagree: {target}")
+    require(len(interfaces) == 1, f"Addon package interfaces disagree: {target}")
+    return package, lua_files, xml_files, addon_order, versions.pop()
+
+
+def main():
+    require(len(sys.argv) in (2, 3), "Usage: addon_check.py REPOSITORY_ROOT [TARGET]")
+    root = Path(os.path.abspath(sys.argv[1]))
+    require(kind(root) == "directory", "Repository root must be a directory")
+    license_path = exact(root, "LICENSE", "file")
+    require(license_path.read_bytes().strip(), "Empty LICENSE")
+    targets = TARGETS if len(sys.argv) == 2 or sys.argv[2] == "both" else [sys.argv[2]]
+    sources = {target: validate_tree(platform_root(root, target), target) for target in targets}
+    require(len({result[-1] for result in sources.values()}) == 1,
+            "Retail and Forever package versions disagree")
     github = exact(root, ".github", "directory")
     workflow_directory = exact(github, "workflows", "directory")
     workflows = children(workflow_directory)
@@ -320,28 +352,24 @@ def main():
         require(kind(path) == "file" and path.suffix in {".yml", ".yaml"},
                 f"Unexpected workflow-directory entry: {path}")
         require(text(path).strip(), f"Empty workflow: {path}")
-    require(lua_files and xml_files and workflows, "Empty check group")
     print(sys.version, flush=True)
     luac = tool(root, "luac5.1", "-v", "Lua 5.1")
     xmllint = tool(root, "xmllint", "--version", "libxml")
     actionlint = tool(root, "actionlint", "-version", "1.7.12")
 
-    for path in sorted(lua_files):
-        run(root, luac, "-p", path)
-
-    for path in sorted(xml_files):
-        run(root, xmllint, "--noout", "--nonet", path)
-
     run(root, actionlint, "-config-file", os.devnull,
         "-shellcheck=", "-pyflakes=", *workflows.values())
-
-    print("Addon dependency order: " + " -> ".join(addon_order))
-
-    for name in sorted(package):
-        print("PACKAGE " + name)
-
-    print(f"PASS: {len(lua_files)} Lua, {len(xml_files)} XML, "
-          f"{len(workflows)} workflows; {len(package)} package files")
+    for target, (package, lua_files, xml_files, addon_order, _) in sources.items():
+        require(lua_files and xml_files, f"Empty check group: {target}")
+        for path in sorted(lua_files):
+            run(root, luac, "-p", path)
+        for path in sorted(xml_files):
+            run(root, xmllint, "--noout", "--nonet", path)
+        print(f"{target} addon dependency order: " + " -> ".join(addon_order))
+        for name in sorted(package):
+            print(f"PACKAGE {TARGETS[target][0]}/{name}")
+        print(f"PASS: {target}, {len(lua_files)} Lua, {len(xml_files)} XML, "
+              f"{len(workflows)} workflows; {len(package)} package files")
 
 
 if __name__ == "__main__":

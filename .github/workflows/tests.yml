@@ -4,15 +4,63 @@ on:
   pull_request:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      target:
+        type: string
+        default: both
 
 permissions:
   contents: read
+
+env:
+  BUILD_TARGET: ${{ inputs.target || (startsWith(github.base_ref, 'retail/') && 'retail') || (startsWith(github.base_ref, 'forever/') && 'forever') || 'both' }}
 
 concurrency:
   group: addon-tests-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  platform-scope:
+    name: Check pull request scope
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check branch and changed paths
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          python3 -I -B - <<'PY'
+          import os
+          import subprocess
+
+          base, head = os.environ["BASE_REF"], os.environ["HEAD_REF"]
+          platforms = {"retail": b"Retail/", "forever": b"Forever/"}
+          base_platform = platforms.get(base.partition("/")[0])
+          head_platform = platforms.get(head.partition("/")[0])
+          if base_platform and head_platform != base_platform:
+              raise SystemExit("Use a source branch with the same platform prefix.")
+          if base == "main" and head_platform and head not in ("retail/dev", "forever/dev"):
+              raise SystemExit("Merge platform work into its dev branch first.")
+          scope = base_platform or (head_platform if base == "main" else None)
+          if scope:
+              allowed = (scope,)
+              if base_platform and base.endswith("/dev") and head.startswith(base.partition("/")[0] + "/sync/"):
+                  allowed += (b".github/workflows/", b".tools/ci/")
+              changed = subprocess.check_output([
+                  "git", "diff", "--name-only", "--no-renames", "-z",
+                  os.environ["BASE_SHA"], "HEAD", "--",
+              ])
+              if any(not path.startswith(allowed) for path in changed.split(b"\0") if path):
+                  raise SystemExit("Pull request changes paths outside its platform scope.")
+          PY
+
   addon-check:
     name: Addon check
     runs-on: ubuntu-24.04
@@ -54,11 +102,17 @@ jobs:
 
       - name: Check addon files and workflow
         shell: bash
-        run: python3 -I -B .tools/ci/addon_check.py .
+        run: python3 -I -B .tools/ci/addon_check.py . "$BUILD_TARGET"
 
-      - name: Check release notes
+      - name: Verify release packages and notes
         shell: bash
-        run: lua5.1 .tools/ci/check_release_notes.lua .
+        run: |
+          set -euo pipefail
+          for target in retail forever; do
+            if [[ "$BUILD_TARGET" == both || "$BUILD_TARGET" == "$target" ]]; then
+              python3 -I -B .tools/ci/build_release.py . "$RUNNER_TEMP/TRP3_Spellbook-$target.zip" --target "$target"
+            fi
+          done
 
   addon-tests:
     name: Addon tests
@@ -83,4 +137,4 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: python3 -I -B .tools/ci/run_tests.py
+        run: python3 -I -B .tools/ci/run_tests.py "$BUILD_TARGET"

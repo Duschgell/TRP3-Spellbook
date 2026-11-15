@@ -1,0 +1,3 @@
+local _, private = ...
+assert(type(_G.TRP3_RPSpellbookAddon) == "table", "TRP3 Spellbook core is required")
+private.Shared = _G.TRP3_RPSpellbookAddon

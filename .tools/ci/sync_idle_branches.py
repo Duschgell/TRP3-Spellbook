@@ -13,6 +13,7 @@ import urllib.request
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 REPOSITORY = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
 PREFIXES = ("feature/", "bugfix/", "task/")
+DEV_BRANCHES = {"retail/dev": "retail", "forever/dev": "forever"}
 MUTATION_ID = "spellbook-idle-sync"
 
 
@@ -35,7 +36,10 @@ def valid_branch(name):
 
 
 def eligible(name):
-    return valid_branch(name) and name.startswith(PREFIXES) and name not in PREFIXES
+    if not valid_branch(name):
+        return False
+    platform, _, branch = name.partition("/")
+    return platform in DEV_BRANCHES.values() and branch.startswith(PREFIXES)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -189,17 +193,20 @@ class GitHub:
             raise SyncError("Branch update rejected; check token permissions and branch rules")
 
 
-def synchronize(client, target, apply=False, report=None):
+def synchronize(client, target, apply=False, report=None, *, dev_branch="retail/dev"):
     if not valid_sha(target):
         raise SyncError("Invalid tested dev revision")
+    if dev_branch not in DEV_BRANCHES:
+        raise SyncError("Invalid development branch")
+    prefix = DEV_BRANCHES[dev_branch] + "/"
     if report is None:
         report = lambda record: print(json.dumps(record, ensure_ascii=True))
-    if client.reference("dev") != target:
+    if client.reference(dev_branch) != target:
         report({"result": "stale-dev"})
         return
     for row in client.snapshots():
         name, before = row["name"], row["commit"]["sha"]
-        if not eligible(name):
+        if not eligible(name) or not name.startswith(prefix):
             continue
         if row["protected"]:
             report({"branch": name, "result": "protected"})
@@ -221,7 +228,7 @@ def synchronize(client, target, apply=False, report=None):
         if client.protected(name):
             report({"branch": name, "result": "protected-or-deleted"})
             continue
-        if client.reference("dev") != target:
+        if client.reference(dev_branch) != target:
             report({"result": "stale-dev"})
             return
         if not apply:
@@ -238,15 +245,18 @@ def synchronize(client, target, apply=False, report=None):
 
 
 def context(apply=False):
+    ref = os.environ.get("GITHUB_REF", "")
+    dev_branch = ref.removeprefix("refs/heads/")
+    if dev_branch not in DEV_BRANCHES or ref != "refs/heads/" + dev_branch:
+        raise SyncError("Apply and dry runs are restricted to a platform dev branch")
     if apply and (os.environ.get("GITHUB_ACTIONS") != "true"
-                  or os.environ.get("GITHUB_EVENT_NAME") != "push"
-                  or os.environ.get("GITHUB_REF") != "refs/heads/dev"):
+                  or os.environ.get("GITHUB_EVENT_NAME") != "push"):
         raise SyncError("Apply is restricted to the dev push workflow")
     repository, target, token = (os.environ.get(key, "") for key in (
         "GITHUB_REPOSITORY", "GITHUB_SHA", "GH_TOKEN"))
     if not REPOSITORY.fullmatch(repository) or not valid_sha(target) or not token:
         raise SyncError("Missing or invalid repository, tested revision or token")
-    return repository, target, token
+    return repository, target, token, dev_branch
 
 
 def main():
@@ -261,8 +271,9 @@ def main():
         print(json.dumps(record, ensure_ascii=True), flush=True)
 
     try:
-        repository, target, token = context(apply=args.apply)
-        synchronize(GitHub(repository, token), target, apply=args.apply, report=report)
+        repository, target, token, dev_branch = context(apply=args.apply)
+        synchronize(GitHub(repository, token), target, apply=args.apply, report=report,
+                    dev_branch=dev_branch)
         return 0
     except SyncError as error:
         report({"result": "failed"})

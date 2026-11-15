@@ -120,7 +120,7 @@ local function main()
     end
 
     local fixtures = assert(loadfile(
-        root .. "/.tools/ci/tests/static.lua"))(root)
+        root .. "/.tools/ci/tests/static.lua"))(root, arg[5])
 
     local function readRunner()
         if probe ~= "" then
