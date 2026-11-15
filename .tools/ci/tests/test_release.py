@@ -86,8 +86,7 @@ class ReleaseTests(unittest.TestCase):
     def test_holiday_files_and_load_entries_are_retail_only(self):
         addon = release.check.CORE
         root = Path(__file__).resolve().parents[3]
-        core = root / "Retail" / addon
-        toc = core / f"{addon}.toc"
+        toc = f"{addon}.toc"
         holiday_files = (
             "Core/SeasonalCalendar.lua", "Data/SeasonalStyles.lua",
             "UI/SeasonalCorners.lua", "UI/SeasonalOrnaments.lua", "UI/SeasonalVisuals.lua",
@@ -101,7 +100,7 @@ class ReleaseTests(unittest.TestCase):
                 release.build(root, output, target=target)
             with ZipFile(output) as archive:
                 includes_holidays = target == "retail"
-                lines = archive.read(f"{addon}/{toc.name}").decode("utf-8").splitlines()
+                lines = archive.read(f"{addon}/{toc}").decode("utf-8").splitlines()
                 versions.append(next(line for line in lines if line.startswith("## Version: ")))
                 self.assertIn("UI\\FancyBookControls.lua", lines)
                 for name in holiday_files:
@@ -109,6 +108,14 @@ class ReleaseTests(unittest.TestCase):
                     self.assertEqual(f"{addon}/{name}" in archive.namelist(), includes_holidays)
         self.assertTrue(versions)
         self.assertEqual(len(set(versions)), 1)
+
+    def test_flat_checkout_packages_only_its_own_client(self):
+        source = self.root / "Forever"
+        release.build(source, self.output, target="forever")
+        with ZipFile(self.output) as archive:
+            self.assertIn(b"'Forever'", archive.read(f"{release.check.CORE}/Main.lua"))
+        with self.assertRaisesRegex(ValueError, "Unexpected retail interface"):
+            release.build(source, self.root / "wrong.zip", target="retail")
 
     def test_forever_manifest_preserves_utf8_bom_and_crlf(self):
         addon = release.check.ADDONS[0]

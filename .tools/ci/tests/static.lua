@@ -97,6 +97,13 @@ function F.fresh(area)
     })
 
     local env, api = environment(), {}
+    local core = root .. "/TRP3_RPSpellbook/"
+    local manifest = io.open(core .. "TRP3_RPSpellbook.toc", "rb")
+    if manifest then
+        manifest:close()
+    else
+        core = root .. "/" .. platform .. "/TRP3_RPSpellbook/"
+    end
     if area == "deflate" then
         local maximum, calls = env.math.max, 0
         env.math.max = function(...)
@@ -120,7 +127,7 @@ function F.fresh(area)
 
         local entry = modules[key]
         local chunk = assert(loadfile(
-            root .. "/" .. platform .. "/TRP3_RPSpellbook/" .. entry[1]))
+            core .. entry[1]))
 
         setfenv(chunk, env)("TRP3_RPSpellbook", addon)
 

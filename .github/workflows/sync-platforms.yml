@@ -1,0 +1,64 @@
+name: Prepare Platform Pull Requests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      platform:
+        type: string
+        required: true
+    secrets:
+      PLATFORM_SYNC_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  backport:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [retail, forever]
+    concurrency:
+      group: platform-transfer-${{ matrix.platform }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.PLATFORM_SYNC_TOKEN || github.token }}
+      - name: Prepare main-to-dev PR
+        env:
+          GH_TOKEN: ${{ secrets.PLATFORM_SYNC_TOKEN || github.token }}
+          PLATFORM: ${{ matrix.platform }}
+        run: python3 -I -B .tools/ci/sync_platform.py "$PLATFORM" from-main "$GITHUB_SHA"
+
+  promote:
+    if: github.event_name == 'push' && ((inputs.platform == 'retail' && github.ref == 'refs/heads/retail/dev') || (inputs.platform == 'forever' && github.ref == 'refs/heads/forever/dev'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: platform-transfer-${{ inputs.platform }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.PLATFORM_SYNC_TOKEN || github.token }}
+      - name: Prepare dev-to-main PR
+        env:
+          GH_TOKEN: ${{ secrets.PLATFORM_SYNC_TOKEN || github.token }}
+          PLATFORM: ${{ inputs.platform }}
+        run: python3 -I -B .tools/ci/sync_platform.py "$PLATFORM" to-main "$GITHUB_SHA"

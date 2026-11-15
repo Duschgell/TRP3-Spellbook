@@ -468,27 +468,37 @@ class WorkflowTests(unittest.TestCase):
         script = textwrap.dedent(workflow.split("python3 -I -B - <<'PY'\n", 1)[1]
                                  .split("\n          PY\n", 1)[0])
         scenarios = (
-            ("retail/dev", "retail/feature/test", b"Retail/test.lua\0", True),
-            ("forever/dev", "forever/bugfix/test", b"Forever/test.lua\0", True),
-            ("retail/dev", "forever/feature/test", b"Retail/test.lua\0", False),
-            ("retail/dev", "retail/feature/test", b"Retail/test.lua\0Forever/test.lua\0", False),
-            ("main", "forever/feature/test", b"Forever/test.lua\0", False),
-            ("main", "forever/dev", b"Forever/test.lua\0", True),
-            ("main", "retail/dev", b".github/workflows/tests.yml\0", False),
-            ("forever/dev", "forever/sync/main", b"Forever/test.lua\0.tools/ci/run_tests.py\0", True),
-            ("forever/dev", "forever/sync/main", b"Retail/test.lua\0", False),
-            ("forever/dev", "main", b"Forever/test.lua\0", False),
+            ("retail/dev", "retail/feature/test", b"TRP3_RPSpellbook/test.lua\0", True),
+            ("forever/dev", "forever/bugfix/test", b"TRP3_RPSpellbook_NPC/test.lua\0", True),
+            ("retail/dev", "forever/feature/test", b"TRP3_RPSpellbook/test.lua\0", False),
+            ("retail/dev", "retail/feature/test", b"TRP3_RPSpellbook/test.lua\0Forever/test.lua\0", False),
+            ("main", "forever/dev", b"Forever/test.lua\0", False),
+            ("main", "platform-sync/forever/to-main", b"Forever/test.lua\0", True),
+            ("main", "platform-sync/forever/to-main", b"Retail/test.lua\0", False),
+            ("main", "platform-sync/forever/to-main", b".github/workflows/tests.yml\0", False),
+            ("forever/dev", "platform-sync/forever/from-main", b"TRP3_RPSpellbook/test.lua\0.tools/ci/run_tests.py\0", True),
+            ("forever/dev", "platform-sync/forever/from-main", b"Retail/test.lua\0", False),
+            ("forever/dev", "main", b"TRP3_RPSpellbook/test.lua\0", False),
         )
         for base, head, paths, accepted in scenarios:
             with self.subTest(base=base, head=head, paths=paths), \
-                    patch.dict(os.environ, BASE_REF=base, HEAD_REF=head, BASE_SHA=OLD), \
-                    patch("subprocess.check_output", return_value=paths) as diff:
+                    patch.dict(os.environ, BASE_REF=base, HEAD_REF=head, BASE_SHA=OLD,
+                               HEAD_REPOSITORY="owner/repo", GITHUB_REPOSITORY="owner/repo"), \
+                    patch("subprocess.check_output", side_effect=lambda args: (
+                        b"" if "--diff-filter=D" in args else paths)) as diff:
                 if accepted:
                     exec(compile(script, "tests.yml", "exec"), {})
                     self.assertEqual(diff.call_args.args[0][-3:], [OLD, "HEAD", "--"])
                 else:
                     with self.assertRaises(SystemExit):
                         exec(compile(script, "tests.yml", "exec"), {})
+        with patch.dict(os.environ, BASE_REF="forever/dev", HEAD_REF="platform-sync/forever/from-main",
+                        BASE_SHA=OLD, HEAD_REPOSITORY="owner/repo", GITHUB_REPOSITORY="owner/repo"), \
+                patch("subprocess.check_output", side_effect=[
+                    b"Retail/obsolete.lua\0Forever/obsolete.lua\0",
+                    b"Retail/obsolete.lua\0Forever/obsolete.lua\0TRP3_RPSpellbook/test.lua\0",
+                ]):
+            exec(compile(script, "tests.yml", "exec"), {})
 
     def test_dev_sync_is_gated_and_does_not_broaden_reusable_checks(self):
         workflow = (ROOT / ".github/workflows/sync-branches.yml").read_text(encoding="utf-8")
@@ -507,6 +517,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn("contents: write", checks)
         self.assertNotIn("  push:", checks)
         self.assertIn("  pull_request:", checks)
+        self.assertIn("types: [opened, synchronize, reopened, edited]", checks)
         self.assertIn("  workflow_call:", checks)
 
 
