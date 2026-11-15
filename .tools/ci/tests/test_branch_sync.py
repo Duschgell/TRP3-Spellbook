@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+import textwrap
 import unittest
 import urllib.error
 from unittest.mock import mock_open, patch
@@ -23,9 +24,9 @@ def branch(name, sha=OLD, protected=False):
 
 class FakeGitHub:
     def __init__(self, branches=None):
-        self.branches = branches if branches is not None else [branch("feature/new")]
+        self.branches = branches if branches is not None else [branch("retail/feature/new")]
         self.heads = {row["name"]: row["commit"]["sha"] for row in self.branches}
-        self.heads["dev"] = TARGET
+        self.heads["retail/dev"] = TARGET
         self.comparisons = {}
         self.updates = []
         self.before_update = None
@@ -36,10 +37,10 @@ class FakeGitHub:
         self.merged_branches = set()
 
     def reference(self, name):
-        if name == "dev":
+        if name == "retail/dev":
             self.dev_reads += 1
             if self.change_dev_at == self.dev_reads:
-                self.heads["dev"] = CHANGED
+                self.heads["retail/dev"] = CHANGED
         return self.heads.get(name)
 
     def snapshots(self):
@@ -75,10 +76,20 @@ class SyncTests(unittest.TestCase):
         return records
 
     def test_all_three_prefixes_fast_forward(self):
-        client = FakeGitHub([branch("feature/new"), branch("bugfix/new"), branch("task/new/one")])
+        client = FakeGitHub([branch("retail/feature/new"), branch("retail/bugfix/new"), branch("retail/task/new/one")])
         self.run_sync(client)
         self.assertEqual(len(client.updates), 3)
         self.assertTrue(all(after == TARGET for _, _, after in client.updates))
+
+    def test_only_the_tested_platform_is_synchronized(self):
+        for platform in ("retail", "forever"):
+            with self.subTest(platform=platform):
+                client = FakeGitHub([branch("retail/feature/new"), branch("forever/feature/new"),
+                                     branch("feature/legacy"), branch("forever/task/current", TARGET)])
+                client.heads["forever/dev"] = TARGET
+                sync.synchronize(client, TARGET, apply=True, report=lambda _: None,
+                                 dev_branch=f"{platform}/dev")
+                self.assertEqual(client.updates, [(f"{platform}/feature/new", OLD, TARGET)])
 
     def test_dry_run_never_writes(self):
         client = FakeGitHub()
@@ -89,16 +100,16 @@ class SyncTests(unittest.TestCase):
     def test_merged_branches_are_not_updated_or_planned(self):
         for apply in (False, True):
             with self.subTest(apply=apply):
-                client = FakeGitHub([branch("feature/merged"), branch("bugfix/merged"),
-                                     branch("task/merged"), branch("feature/new")])
-                client.merged_branches.update(("feature/merged", "bugfix/merged", "task/merged"))
+                client = FakeGitHub([branch("retail/feature/merged"), branch("retail/bugfix/merged"),
+                                     branch("retail/task/merged"), branch("retail/feature/new")])
+                client.merged_branches.update(("retail/feature/merged", "retail/bugfix/merged", "retail/task/merged"))
                 records = self.run_sync(client, apply=apply)
                 self.assertEqual(sum(row["result"] == "merged" for row in records), 3)
-                self.assertEqual(client.updates, [("feature/new", OLD, TARGET)] if apply else [])
+                self.assertEqual(client.updates, [("retail/feature/new", OLD, TARGET)] if apply else [])
 
     def test_previously_auto_updated_merged_branch_still_stays_excluded(self):
-        client = FakeGitHub([branch("feature/merged", CHANGED)])
-        client.merged_branches.add("feature/merged")
+        client = FakeGitHub([branch("retail/feature/merged", CHANGED)])
+        client.merged_branches.add("retail/feature/merged")
         records = self.run_sync(client)
         self.assertEqual(client.updates, [])
         self.assertEqual(records[-1]["result"], "merged")
@@ -114,8 +125,8 @@ class SyncTests(unittest.TestCase):
 
     def test_unrelated_protected_and_current_branches_are_untouched(self):
         client = FakeGitHub([
-            branch("main"), branch("dev", TARGET), branch("release/1.0"),
-            branch("feature/protected", protected=True), branch("task/current", TARGET),
+            branch("main"), branch("retail/dev", TARGET), branch("release/1.0"),
+            branch("retail/feature/protected", protected=True), branch("retail/task/current", TARGET),
         ])
         self.run_sync(client)
         self.assertEqual(client.updates, [])
@@ -149,12 +160,12 @@ class SyncTests(unittest.TestCase):
 
     def test_stale_dev_does_not_write(self):
         client = FakeGitHub()
-        client.heads["dev"] = CHANGED
+        client.heads["retail/dev"] = CHANGED
         self.run_sync(client)
         self.assertEqual(client.updates, [])
 
     def test_dev_advance_stops_remaining_updates(self):
-        client = FakeGitHub([branch("feature/a"), branch("feature/b")])
+        client = FakeGitHub([branch("retail/feature/a"), branch("retail/feature/b")])
         client.change_dev_at = 3
         self.run_sync(client)
         self.assertLess(len(client.updates), 2)
@@ -163,7 +174,7 @@ class SyncTests(unittest.TestCase):
         client = FakeGitHub()
         client.before_update = lambda api, name: api.heads.__setitem__(name, CHANGED)
         records = self.run_sync(client)
-        self.assertEqual(client.heads["feature/new"], CHANGED)
+        self.assertEqual(client.heads["retail/feature/new"], CHANGED)
         self.assertEqual(client.updates, [])
         self.assertEqual(records[-1]["result"], "changed")
 
@@ -171,7 +182,7 @@ class SyncTests(unittest.TestCase):
         client = FakeGitHub()
         client.before_update = lambda api, name: api.heads.pop(name)
         self.run_sync(client)
-        self.assertNotIn("feature/new", client.heads)
+        self.assertNotIn("retail/feature/new", client.heads)
         self.assertEqual(client.updates, [])
 
     def test_concurrent_fast_forward_to_target_is_safe(self):
@@ -179,7 +190,7 @@ class SyncTests(unittest.TestCase):
         client.before_update = lambda api, name: api.heads.__setitem__(name, TARGET)
         self.run_sync(client)
         self.assertEqual(client.updates, [])
-        self.assertEqual(client.heads["feature/new"], TARGET)
+        self.assertEqual(client.heads["retail/feature/new"], TARGET)
 
     def test_permission_failure_is_not_hidden_or_retried(self):
         client = FakeGitHub()
@@ -190,21 +201,21 @@ class SyncTests(unittest.TestCase):
 
     def test_newly_protected_branch_is_skipped(self):
         client = FakeGitHub()
-        client.newly_protected.add("feature/new")
+        client.newly_protected.add("retail/feature/new")
         records = self.run_sync(client)
         self.assertEqual(client.updates, [])
         self.assertEqual(records[-1]["result"], "protected-or-deleted")
 
     def test_dev_advance_during_mutation_can_only_apply_the_tested_revision(self):
         client = FakeGitHub()
-        client.before_update = lambda api, name: api.heads.__setitem__("dev", CHANGED)
+        client.before_update = lambda api, name: api.heads.__setitem__("retail/dev", CHANGED)
         self.run_sync(client)
-        self.assertEqual(client.updates, [("feature/new", OLD, TARGET)])
-        self.assertNotEqual(client.heads["feature/new"], CHANGED)
+        self.assertEqual(client.updates, [("retail/feature/new", OLD, TARGET)])
+        self.assertNotEqual(client.heads["retail/feature/new"], CHANGED)
 
     def test_invalid_context_stops_before_network(self):
         good = {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_NAME": "push",
-                "GITHUB_REF": "refs/heads/dev", "GITHUB_SHA": TARGET,
+                "GITHUB_REF": "refs/heads/retail/dev", "GITHUB_SHA": TARGET,
                 "GITHUB_REPOSITORY": "owner/repo", "GH_TOKEN": "test-only"}
         for change in ({"GITHUB_EVENT_NAME": "pull_request"},
                        {"GITHUB_EVENT_NAME": "release"}, {"GITHUB_REF": "refs/heads/main"},
@@ -219,7 +230,7 @@ class TransportTests(unittest.TestCase):
     def client(self):
         return sync.GitHub("owner/repo", "test-secret-not-real")
 
-    def pull_request(self, name="feature/new", repository="owner/repo", merged=True):
+    def pull_request(self, name="retail/feature/new", repository="owner/repo", merged=True):
         return {"merged_at": "2026-10-28T12:00:00Z" if merged else None,
                 "head": {"ref": name, "repo": {"full_name": repository}}}
 
@@ -230,9 +241,9 @@ class TransportTests(unittest.TestCase):
             calls.append(path)
             return [self.pull_request()]
         api.request = request
-        self.assertTrue(api.was_merged("feature/new"))
+        self.assertTrue(api.was_merged("retail/feature/new"))
         query = sync.urllib.parse.parse_qs(sync.urllib.parse.urlsplit(calls[0]).query)
-        self.assertEqual(query["head"], ["owner:feature/new"])
+        self.assertEqual(query["head"], ["owner:retail/feature/new"])
         self.assertEqual(query["state"], ["closed"])
         self.assertNotIn("base", query)
 
@@ -240,10 +251,10 @@ class TransportTests(unittest.TestCase):
         api = self.client()
         api.request = lambda *args: [self.pull_request(merged=False),
                                     self.pull_request(repository="fork/repo"),
-                                    self.pull_request(name="feature/other"),
+                                    self.pull_request(name="retail/feature/other"),
                                     {"merged_at": "2026-10-28T12:00:00Z",
-                                     "head": {"ref": "feature/new", "repo": None}}]
-        self.assertFalse(api.was_merged("feature/new"))
+                                     "head": {"ref": "retail/feature/new", "repo": None}}]
+        self.assertFalse(api.was_merged("retail/feature/new"))
 
     def test_merged_pr_lookup_paginates_past_unmerged_entries(self):
         api = self.client()
@@ -253,7 +264,7 @@ class TransportTests(unittest.TestCase):
             query = sync.urllib.parse.parse_qs(sync.urllib.parse.urlsplit(path).query)
             return [self.pull_request(merged=False)] * 100 if query["page"] == ["1"] else [self.pull_request()]
         api.request = request
-        self.assertTrue(api.was_merged("feature/new"))
+        self.assertTrue(api.was_merged("retail/feature/new"))
         self.assertEqual(len(calls), 2)
 
     def test_invalid_or_unbounded_pr_history_fails_closed(self):
@@ -264,11 +275,11 @@ class TransportTests(unittest.TestCase):
             with self.subTest(response_size=len(response)):
                 api = self.client(); api.request = lambda *args: response
                 with self.assertRaises(sync.SyncError):
-                    api.was_merged("feature/new")
+                    api.was_merged("retail/feature/new")
         api = self.client()
         api.request = lambda *args: [self.pull_request(merged=False)] * 100
         with self.assertRaises(sync.SyncError):
-            api.was_merged("feature/new")
+            api.was_merged("retail/feature/new")
 
     def test_mutation_requires_exact_old_oid_and_no_force(self):
         api = self.client()
@@ -279,15 +290,15 @@ class TransportTests(unittest.TestCase):
                 return {"node_id": "R_test"}
             return {"data": {"updateRefs": {"clientMutationId": "spellbook-idle-sync"}}}
         api.request = request
-        api.fast_forward("feature/new", OLD, TARGET)
+        api.fast_forward("retail/feature/new", OLD, TARGET)
         update = calls[-1][1]["variables"]["input"]["refUpdates"][0]
-        self.assertEqual(update, {"name": "refs/heads/feature/new", "beforeOid": OLD,
+        self.assertEqual(update, {"name": "refs/heads/retail/feature/new", "beforeOid": OLD,
                                   "afterOid": TARGET, "force": False})
 
     def test_mutation_cannot_target_other_prefixes(self):
         api = self.client()
         api.request = lambda *args: self.fail("Network called for forbidden ref")
-        for name in ("dev", "main", "release/1", "feature/", "feature/x\n::error::bad"):
+        for name in ("retail/dev", "main", "release/1", "retail/feature/", "retail/feature/x\n::error::bad"):
             with self.subTest(name=name), self.assertRaises(sync.SyncError):
                 api.fast_forward(name, OLD, TARGET)
 
@@ -296,14 +307,14 @@ class TransportTests(unittest.TestCase):
         api.request = lambda path, payload=None: (
             {"node_id": "R_test"} if path != "/graphql" else {"errors": [{"message": "denied"}]})
         with self.assertRaises(sync.SyncError):
-            api.fast_forward("feature/new", OLD, TARGET)
+            api.fast_forward("retail/feature/new", OLD, TARGET)
 
     def test_branch_listing_is_paginated_before_writing(self):
         api = self.client()
         pages = []
         def request(path, payload=None):
             pages.append(path)
-            return [branch("feature/" + str(i)) for i in range(100)] if "page=1&" in path else []
+            return [branch("retail/feature/" + str(i)) for i in range(100)] if "page=1&" in path else []
         api.request = request
         self.assertEqual(len(api.snapshots()), 100)
         self.assertEqual(len(pages), 2)
@@ -313,26 +324,26 @@ class TransportTests(unittest.TestCase):
         def missing(*args):
             raise sync.SyncError("missing", status=404)
         api.request = missing
-        self.assertIsNone(api.reference("feature/deleted"))
+        self.assertIsNone(api.reference("retail/feature/deleted"))
 
     def test_protection_lookup_rejects_unknown_and_missing_branches(self):
         api = self.client()
-        for response in ({"name": "feature/new", "protected": True},
+        for response in ({"name": "retail/feature/new", "protected": True},
                          {"name": "other", "protected": False}, {}):
             api.request = lambda *args: response
-            if response.get("name") == "feature/new":
-                self.assertTrue(api.protected("feature/new"))
+            if response.get("name") == "retail/feature/new":
+                self.assertTrue(api.protected("retail/feature/new"))
             else:
                 with self.assertRaises(sync.SyncError):
-                    api.protected("feature/new")
+                    api.protected("retail/feature/new")
         def missing(*args):
             raise sync.SyncError("missing", status=404)
         api.request = missing
-        self.assertTrue(api.protected("feature/new"))
+        self.assertTrue(api.protected("retail/feature/new"))
 
     def test_invalid_api_payloads_fail_closed(self):
-        for response in ({}, [branch("feature/x", "bad")],
-                         [{**branch("feature/x"), "protected": "false"}]):
+        for response in ({}, [branch("retail/feature/x", "bad")],
+                         [{**branch("retail/feature/x"), "protected": "false"}]):
             with self.subTest(response=response):
                 api = self.client(); api.request = lambda *args: response
                 with self.assertRaises(sync.SyncError):
@@ -343,7 +354,7 @@ class TransportTests(unittest.TestCase):
         api.request = lambda *args: self.fail("Network called for zero OID")
         for before, after in (("0" * 40, TARGET), (OLD, "0" * 40)):
             with self.subTest(before=before, after=after), self.assertRaises(sync.SyncError):
-                api.fast_forward("feature/new", before, after)
+                api.fast_forward("retail/feature/new", before, after)
 
     def test_malformed_success_is_not_accepted(self):
         for response in ({}, {"data": None}, {"data": {"updateRefs": None}},
@@ -353,22 +364,22 @@ class TransportTests(unittest.TestCase):
                 api.request = lambda path, payload=None: (
                     {"node_id": "R_test"} if path != "/graphql" else response)
                 with self.assertRaises(sync.SyncError):
-                    api.fast_forward("task/new", OLD, TARGET)
+                    api.fast_forward("retail/task/new", OLD, TARGET)
 
     def test_inconsistent_paginated_listing_fails_before_mutations(self):
         api = self.client()
-        first = [branch("feature/" + str(i)) for i in range(100)]
-        api.request = lambda path, payload=None: first if "page=1&" in path else [branch("feature/0", CHANGED)]
+        first = [branch("retail/feature/" + str(i)) for i in range(100)]
+        api.request = lambda path, payload=None: first if "page=1&" in path else [branch("retail/feature/0", CHANGED)]
         with self.assertRaises(sync.SyncError):
             api.snapshots()
 
     def test_malformed_reference_is_not_trusted(self):
-        for response in ([], {}, {"ref": "refs/heads/dev", "object": {"type": "tree", "sha": TARGET}},
+        for response in ([], {}, {"ref": "refs/heads/retail/dev", "object": {"type": "tree", "sha": TARGET}},
                          {"ref": "refs/heads/main", "object": {"type": "commit", "sha": TARGET}}):
             with self.subTest(response=response):
                 api = self.client(); api.request = lambda *args: response
                 with self.assertRaises(sync.SyncError):
-                    api.reference("dev")
+                    api.reference("retail/dev")
 
     def test_timeout_and_http_errors_do_not_expose_token_or_retry(self):
         errors = [TimeoutError("test-secret-not-real"),
@@ -406,7 +417,7 @@ class TransportTests(unittest.TestCase):
 class CommandTests(unittest.TestCase):
     def run_command(self, client, apply=False, environment=None):
         env = {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_NAME": "push",
-               "GITHUB_REF": "refs/heads/dev", "GITHUB_SHA": TARGET,
+               "GITHUB_REF": "refs/heads/retail/dev", "GITHUB_SHA": TARGET,
                "GITHUB_REPOSITORY": "owner/repo", "GH_TOKEN": "test-only",
                "GITHUB_STEP_SUMMARY": "test-summary-not-on-disk"}
         env.update(environment or {})
@@ -440,11 +451,11 @@ class CommandTests(unittest.TestCase):
         self.assertIn("failed: 1", summary)
 
     def test_partial_failure_keeps_failure_exit_and_both_summary_counts(self):
-        client = FakeGitHub([branch("feature/a"), branch("feature/b")])
-        client.before_update = lambda api, name: setattr(api, "reject", name == "feature/b")
+        client = FakeGitHub([branch("retail/feature/a"), branch("retail/feature/b")])
+        client.before_update = lambda api, name: setattr(api, "reject", name == "retail/feature/b")
         result, output, errors, summary, _ = self.run_command(client, apply=True)
         self.assertEqual(result, 1)
-        self.assertEqual(client.updates, [("feature/a", OLD, TARGET)])
+        self.assertEqual(client.updates, [("retail/feature/a", OLD, TARGET)])
         self.assertEqual([json.loads(line)["result"] for line in output.splitlines()], ["updated", "failed"])
         self.assertIn("updated: 1", summary)
         self.assertIn("failed: 1", summary)
@@ -452,15 +463,43 @@ class CommandTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_pull_request_scope(self):
+        workflow = (ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
+        script = textwrap.dedent(workflow.split("python3 -I -B - <<'PY'\n", 1)[1]
+                                 .split("\n          PY\n", 1)[0])
+        scenarios = (
+            ("retail/dev", "retail/feature/test", b"Retail/test.lua\0", True),
+            ("forever/dev", "forever/bugfix/test", b"Forever/test.lua\0", True),
+            ("retail/dev", "forever/feature/test", b"Retail/test.lua\0", False),
+            ("retail/dev", "retail/feature/test", b"Retail/test.lua\0Forever/test.lua\0", False),
+            ("main", "forever/feature/test", b"Forever/test.lua\0", False),
+            ("main", "forever/dev", b"Forever/test.lua\0", True),
+            ("main", "retail/dev", b".github/workflows/tests.yml\0", False),
+            ("forever/dev", "forever/sync/main", b"Forever/test.lua\0.tools/ci/run_tests.py\0", True),
+            ("forever/dev", "forever/sync/main", b"Retail/test.lua\0", False),
+            ("forever/dev", "main", b"Forever/test.lua\0", False),
+        )
+        for base, head, paths, accepted in scenarios:
+            with self.subTest(base=base, head=head, paths=paths), \
+                    patch.dict(os.environ, BASE_REF=base, HEAD_REF=head, BASE_SHA=OLD), \
+                    patch("subprocess.check_output", return_value=paths) as diff:
+                if accepted:
+                    exec(compile(script, "tests.yml", "exec"), {})
+                    self.assertEqual(diff.call_args.args[0][-3:], [OLD, "HEAD", "--"])
+                else:
+                    with self.assertRaises(SystemExit):
+                        exec(compile(script, "tests.yml", "exec"), {})
+
     def test_dev_sync_is_gated_and_does_not_broaden_reusable_checks(self):
         workflow = (ROOT / ".github/workflows/sync-branches.yml").read_text(encoding="utf-8")
         checks = (ROOT / ".github/workflows/tests.yml").read_text(encoding="utf-8")
-        self.assertIn("branches: [dev]", workflow)
+        self.assertIn("branches: [retail/dev, forever/dev]", workflow)
         self.assertIn("uses: ./.github/workflows/tests.yml", workflow)
         self.assertIn("needs: checks", workflow)
         self.assertIn("needs.checks.result == 'success'", workflow)
         self.assertIn("github.event_name == 'push'", workflow)
-        self.assertIn("github.ref == 'refs/heads/dev'", workflow)
+        for platform in ("retail", "forever"):
+            self.assertIn(f"github.ref == 'refs/heads/{platform}/dev'", workflow)
         self.assertIn("contents: write", workflow)
         self.assertIn("      pull-requests: read", workflow)
         self.assertIn("persist-credentials: false", workflow)
