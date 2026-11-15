@@ -33,7 +33,9 @@ jobs:
 
       - name: Verify release comes from main
         shell: bash
-        run: git merge-base --is-ancestor HEAD refs/remotes/origin/main
+        run: |
+          set -euo pipefail
+          git rev-list --first-parent refs/remotes/origin/main | grep -Fx "$(git rev-parse HEAD)" >/dev/null
 
       - name: Prepare release notes check
         shell: bash

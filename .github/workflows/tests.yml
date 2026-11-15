@@ -2,6 +2,7 @@ name: Addon Tests
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -34,6 +35,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.head_ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
         shell: bash
         run: |
           python3 -I -B - <<'PY'
@@ -42,23 +44,39 @@ jobs:
 
           base, head = os.environ["BASE_REF"], os.environ["HEAD_REF"]
           platforms = {"retail": b"Retail/", "forever": b"Forever/"}
-          base_platform = platforms.get(base.partition("/")[0])
-          head_platform = platforms.get(head.partition("/")[0])
-          if base_platform and head_platform != base_platform:
-              raise SystemExit("Use a source branch with the same platform prefix.")
-          if base == "main" and head_platform and head not in ("retail/dev", "forever/dev"):
-              raise SystemExit("Merge platform work into its dev branch first.")
-          scope = base_platform or (head_platform if base == "main" else None)
-          if scope:
-              allowed = (scope,)
-              if base_platform and base.endswith("/dev") and head.startswith(base.partition("/")[0] + "/sync/"):
+          addon_dirs = (b"TRP3_RPSpellbook/", b"TRP3_RPSpellbook_GameMaster/", b"TRP3_RPSpellbook_NPC/")
+          base_platform, head_platform = base.partition("/")[0], head.partition("/")[0]
+          same_repo = os.environ["HEAD_REPOSITORY"] == os.environ["GITHUB_REPOSITORY"]
+          allowed = ()
+          removed = ()
+          if base_platform in platforms:
+              automated = same_repo and base == f"{base_platform}/dev" and head == f"platform-sync/{base_platform}/from-main"
+              if not automated and head_platform != base_platform:
+                  raise SystemExit("Use the matching platform branch or the platform sync workflow.")
+              allowed = addon_dirs
+              if automated:
                   allowed += (b".github/workflows/", b".tools/ci/")
-              changed = subprocess.check_output([
-                  "git", "diff", "--name-only", "--no-renames", "-z",
-                  os.environ["BASE_SHA"], "HEAD", "--",
-              ])
-              if any(not path.startswith(allowed) for path in changed.split(b"\0") if path):
-                  raise SystemExit("Pull request changes paths outside its platform scope.")
+                  removed = tuple(platforms.values())
+          elif base == "main":
+              if head_platform in platforms:
+                  raise SystemExit("Use the generated platform promotion PR to merge into main.")
+              if head.startswith("platform-sync/"):
+                  _, _, suffix = head.partition("/")
+                  platform, _, direction = suffix.partition("/")
+                  if not same_repo or platform not in platforms or direction != "to-main":
+                      raise SystemExit("Invalid platform promotion branch.")
+                  allowed = (platforms[platform],)
+          if allowed:
+              def changes(*options):
+                  return set(subprocess.check_output([
+                      "git", "diff", "--name-only", "--no-renames", "-z", *options,
+                      os.environ["BASE_SHA"], "HEAD", "--",
+                  ]).split(b"\0")) - {b""}
+
+              deleted = changes("--diff-filter=D") if removed else set()
+              for name in changes():
+                  if not name.startswith(allowed) and not (name in deleted and name.startswith(removed)):
+                      raise SystemExit("Pull request changes paths outside its platform scope.")
           PY
 
   addon-check:
