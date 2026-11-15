@@ -195,6 +195,10 @@ def run(root, *command):
 
 def platform_root(root, target):
     require(target in TARGETS, f"Unsupported build target: {target}")
+    if root.joinpath(CORE).exists():
+        require(not any(root.joinpath(config[0]).exists() for config in TARGETS.values()),
+                "Unexpected mix of flat and integration layouts")
+        return root
     return exact(root, TARGETS[target][0], "directory")
 
 
