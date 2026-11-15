@@ -2,7 +2,7 @@ name: Dev Checks and Branch Sync
 
 on:
   push:
-    branches: [dev]
+    branches: [retail/dev, forever/dev]
 
 permissions:
   contents: read
@@ -15,11 +15,13 @@ jobs:
   checks:
     name: Dev checks
     uses: ./.github/workflows/tests.yml
+    with:
+      target: ${{ startsWith(github.ref, 'refs/heads/retail/') && 'retail' || 'forever' }}
 
   sync:
     name: Fast-forward idle branches
     needs: checks
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && needs.checks.result == 'success'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/retail/dev' || github.ref == 'refs/heads/forever/dev') && needs.checks.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
